@@ -7,16 +7,33 @@ export const SHEET_HEADERS = [
   'hora_entrada',
   'hora_salida',
   'estado',
+  'horas_trabajadas',
+  'horas_esperadas',
 ] as const;
 
-export const SHEET_HEADER_RANGE = `${SHEET_NAME}!A1:F1`;
-export const SHEET_DATA_RANGE = `${SHEET_NAME}!A:F`;
+export const SHEET_HEADER_RANGE = `${SHEET_NAME}!A1:H1`;
+export const SHEET_DATA_RANGE = `${SHEET_NAME}!A:H`;
+
+export const HORARIOS_SHEET_NAME = 'Horarios';
+
+export const HORARIOS_HEADERS = [
+  'discord_id',
+  'nombre',
+  'dia',
+  'hora_inicio',
+  'hora_fin',
+] as const;
+
+export const HORARIOS_HEADER_RANGE = `${HORARIOS_SHEET_NAME}!A1:E1`;
+export const HORARIOS_DATA_RANGE = `${HORARIOS_SHEET_NAME}!A:E`;
 
 export const DEFAULT_TIMEZONE = 'America/Mexico_City';
 
 export const ATTENDANCE_STATUS = {
   PUNTUAL: 'Puntual',
   TARDANZA: 'Tardanza',
+  FUERA_DE_HORARIO: 'Fuera de horario',
+  INCOMPLETO: 'Incompleto',
   SIN_REGISTRO: 'Sin registro',
 } as const;
 
@@ -26,6 +43,8 @@ export const ATTENDANCE_STATUS_LABELS: Record<
 > = {
   [ATTENDANCE_STATUS.PUNTUAL]: 'Puntual',
   [ATTENDANCE_STATUS.TARDANZA]: 'Tardanza',
+  [ATTENDANCE_STATUS.FUERA_DE_HORARIO]: 'Fuera de horario',
+  [ATTENDANCE_STATUS.INCOMPLETO]: 'Incompleto',
   [ATTENDANCE_STATUS.SIN_REGISTRO]: 'Sin registro',
 };
 

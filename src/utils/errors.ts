@@ -1,4 +1,4 @@
-export type AttendanceErrorType = 'default' | 'entry_hours_closed';
+export type AttendanceErrorType = 'default';
 
 export class AttendanceError extends Error {
   constructor(
