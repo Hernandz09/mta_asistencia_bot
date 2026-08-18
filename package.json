@@ -7,7 +7,9 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
-    "deploy-commands": "tsx src/deploy-commands.ts"
+    "deploy-commands": "tsx src/deploy-commands.ts",
+    "seed:horarios": "tsx src/scripts/seedHorarios.ts",
+    "test": "vitest run"
   },
   "keywords": [
     "discord",
@@ -23,11 +25,14 @@
   "dependencies": {
     "discord.js": "^14.16.3",
     "dotenv": "^16.4.7",
-    "googleapis": "^144.0.0"
+    "googleapis": "^144.0.0",
+    "node-cron": "^4.6.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "@types/node-cron": "^3.0.11",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.11"
   }
 }
