@@ -9,6 +9,8 @@
     "dev": "tsx watch src/index.ts",
     "deploy-commands": "tsx src/deploy-commands.ts",
     "seed:horarios": "tsx src/scripts/seedHorarios.ts",
+    "format:sheets": "tsx src/scripts/formatSheets.ts",
+    "setup:practicantes-clases": "tsx src/scripts/setupPracticantesYClases.ts",
     "test": "vitest run"
   },
   "keywords": [

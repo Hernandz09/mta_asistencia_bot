@@ -8,7 +8,7 @@ export const SHEET_HEADERS = [
   'hora_salida',
   'estado',
   'horas_trabajadas',
-  'horas_esperadas',
+  'horas_restantes',
 ] as const;
 
 export const SHEET_HEADER_RANGE = `${SHEET_NAME}!A1:H1`;
@@ -26,6 +26,20 @@ export const HORARIOS_HEADERS = [
 
 export const HORARIOS_HEADER_RANGE = `${HORARIOS_SHEET_NAME}!A1:E1`;
 export const HORARIOS_DATA_RANGE = `${HORARIOS_SHEET_NAME}!A:E`;
+
+export const PRACTICANTES_SHEET_NAME = 'Practicantes';
+
+export const PRACTICANTES_HEADERS = [
+  'discord_id',
+  'nombre',
+  'carrera',
+  'ciclo',
+] as const;
+
+export const PRACTICANTES_HEADER_RANGE = `${PRACTICANTES_SHEET_NAME}!A1:D1`;
+export const PRACTICANTES_DATA_RANGE = `${PRACTICANTES_SHEET_NAME}!A:D`;
+
+export const CLASES_SHEET_NAME = 'Clases';
 
 export const DEFAULT_TIMEZONE = 'America/Mexico_City';
 
