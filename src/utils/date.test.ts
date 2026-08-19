@@ -1,9 +1,48 @@
 import { describe, expect, it } from 'vitest';
 import {
   computeHoursDifference,
+  formatDurationHours,
+  formatDurationHoursWords,
   getCurrentWeekRange,
   getWeekdayNumber,
 } from './date';
+
+describe('formatDurationHoursWords', () => {
+  it('combina horas y minutos con singular/plural correcto', () => {
+    expect(formatDurationHoursWords(3.4166)).toBe('3 horas 25 minutos');
+    expect(formatDurationHoursWords(1)).toBe('1 hora');
+    expect(formatDurationHoursWords(1 + 1 / 60)).toBe('1 hora 1 minuto');
+  });
+
+  it('muestra solo minutos si es menos de una hora', () => {
+    expect(formatDurationHoursWords(13 / 60)).toBe('13 minutos');
+  });
+
+  it('muestra "0 minutos" cuando no queda nada', () => {
+    expect(formatDurationHoursWords(0)).toBe('0 minutos');
+  });
+});
+
+describe('formatDurationHours', () => {
+  it('muestra solo minutos si es menos de una hora', () => {
+    expect(formatDurationHours(0.75)).toBe('45min');
+    expect(formatDurationHours(0.25)).toBe('15min');
+  });
+
+  it('muestra solo horas si son horas exactas', () => {
+    expect(formatDurationHours(6)).toBe('6h');
+    expect(formatDurationHours(0)).toBe('0min');
+  });
+
+  it('muestra horas y minutos combinados', () => {
+    expect(formatDurationHours(2.5)).toBe('2h 30min');
+    expect(formatDurationHours(4.75)).toBe('4h 45min');
+  });
+
+  it('ignora el signo (usa el valor absoluto)', () => {
+    expect(formatDurationHours(-3.25)).toBe('3h 15min');
+  });
+});
 
 describe('computeHoursDifference', () => {
   it('calcula la diferencia decimal entre dos horas HH:mm:ss', () => {

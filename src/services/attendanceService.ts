@@ -1,3 +1,4 @@
+import { BUSINESS_RULES } from '../config/business';
 import { AppConfig } from '../config/env';
 import { ATTENDANCE_STATUS } from '../config/constants';
 import {
@@ -6,25 +7,37 @@ import {
 } from '../interfaces/attendance.interface';
 import { AttendanceError } from '../utils/errors';
 import {
+  computeHoursDifference,
+  formatDurationHoursWords,
   getCurrentTime,
+  getCurrentWeekRange,
   getTodayDate,
-  isWithinEntryWindow,
-  resolveEntryPunctualityStatus,
 } from '../utils/date';
 import { logger } from '../utils/logger';
 import { DashboardService } from './dashboardService';
+import { resolveAttendanceStatus, ScheduleService } from './scheduleService';
 import { SheetsService } from './sheetsService';
+
+export interface WeeklySummary {
+  startDate: string;
+  endDate: string;
+  horasAcumuladas: number;
+  meta: number;
+  diferencia: number;
+}
 
 export class AttendanceService {
   private sheetsService: SheetsService;
   private dashboardService: DashboardService | null;
+  private scheduleService: ScheduleService;
   private timezone: string;
 
-  constructor(config: AppConfig) {
+  constructor(config: AppConfig, scheduleService: ScheduleService) {
     this.sheetsService = new SheetsService(config.google);
     this.dashboardService = config.dashboard
       ? new DashboardService(config.dashboard)
       : null;
+    this.scheduleService = scheduleService;
     this.timezone = config.timezone;
   }
 
@@ -43,7 +56,11 @@ export class AttendanceService {
   async registerEntry(
     discordId: string,
     username: string,
-  ): Promise<{ date: string; entryTime: string; status: AttendanceStatus }> {
+  ): Promise<{
+    date: string;
+    entryTime: string;
+    status: AttendanceStatus;
+  }> {
     const date = getTodayDate(this.timezone);
     const entryTime = getCurrentTime(this.timezone);
 
@@ -56,15 +73,12 @@ export class AttendanceService {
       );
     }
 
-    if (!isWithinEntryWindow(entryTime)) {
-      throw new AttendanceError(
-        'Entry outside allowed hours',
-        'El horario de registro de entrada ha finalizado.',
-        'entry_hours_closed',
-      );
-    }
-
-    const status = resolveEntryPunctualityStatus(entryTime);
+    const schedule = this.scheduleService.getSchedule(discordId, date);
+    const status = resolveAttendanceStatus(
+      entryTime,
+      schedule,
+      BUSINESS_RULES.punctuality.toleranceMinutes,
+    );
 
     await this.sheetsService.appendEntry(
       discordId,
@@ -85,9 +99,12 @@ export class AttendanceService {
     return { date, entryTime, status };
   }
 
-  async registerExit(
-    discordId: string,
-  ): Promise<{ date: string; exitTime: string }> {
+  async registerExit(discordId: string): Promise<{
+    date: string;
+    exitTime: string;
+    horasTrabajadas: number;
+    horasRestantes: string;
+  }> {
     const date = getTodayDate(this.timezone);
     const exitTime = getCurrentTime(this.timezone);
 
@@ -107,11 +124,28 @@ export class AttendanceService {
       );
     }
 
-    await this.sheetsService.updateExit(record.rowIndex, exitTime);
+    const schedule = this.scheduleService.getSchedule(discordId, record.date);
+    const horasBloqueDelDia = schedule
+      ? computeHoursDifference(schedule.start, schedule.end)
+      : 0;
+    const horasTrabajadas = computeHoursDifference(record.entryTime, exitTime);
+    const horasRestantesNumero = Math.max(
+      0,
+      Math.round((horasBloqueDelDia - horasTrabajadas) * 100) / 100,
+    );
+    const horasRestantes = formatDurationHoursWords(horasRestantesNumero);
+
+    await this.sheetsService.updateExit(
+      record.rowIndex,
+      exitTime,
+      record.status,
+      horasTrabajadas,
+      horasRestantes,
+    );
 
     await this.syncExitToDashboard(discordId, date, exitTime);
 
-    return { date, exitTime };
+    return { date, exitTime, horasTrabajadas, horasRestantes };
   }
 
   async getTodayStatus(discordId: string): Promise<AttendanceStatusResult> {
@@ -124,17 +158,94 @@ export class AttendanceService {
         entryTime: null,
         exitTime: null,
         status: ATTENDANCE_STATUS.SIN_REGISTRO,
+        horasTrabajadas: null,
+        horasRestantes: null,
       };
     }
-
-    const status = this.resolveStoredStatus(record.status);
 
     return {
       date: record.date,
       entryTime: record.entryTime || null,
       exitTime: record.exitTime || null,
-      status,
+      status: this.resolveStoredStatus(record.status),
+      horasTrabajadas: record.horasTrabajadas,
+      horasRestantes: record.horasRestantes,
     };
+  }
+
+  async getWeeklySummary(discordId: string): Promise<WeeklySummary> {
+    const { startDate, endDate } = getCurrentWeekRange(this.timezone);
+    const records = await this.sheetsService.findRecordsInRange(
+      discordId,
+      startDate,
+      endDate,
+    );
+
+    const horasAcumuladas = records.reduce(
+      (total, record) => total + (record.horasTrabajadas ?? 0),
+      0,
+    );
+    const meta = BUSINESS_RULES.weeklyGoalHours;
+
+    return {
+      startDate,
+      endDate,
+      horasAcumuladas: Math.round(horasAcumuladas * 100) / 100,
+      meta,
+      diferencia: Math.round((horasAcumuladas - meta) * 100) / 100,
+    };
+  }
+
+  /**
+   * Cierra las entradas que quedaron abiertas al final del día (el
+   * practicante marcó entrada pero nunca salida), usando la hora_fin de su
+   * horario ese día como hora de salida. Pensado para correr una vez al día
+   * desde un job (ver autoCloseJob).
+   */
+  async closeUnfinishedEntries(date?: string): Promise<number> {
+    const targetDate = date ?? getTodayDate(this.timezone);
+    const openRecords =
+      await this.sheetsService.findOpenRecordsForDate(targetDate);
+
+    for (const record of openRecords) {
+      const schedule = this.scheduleService.getSchedule(
+        record.discordId,
+        targetDate,
+      );
+      const exitTime = schedule
+        ? `${schedule.end}:00`
+        : BUSINESS_RULES.autoClose.fallbackExitTime;
+      const horasBloqueDelDia = schedule
+        ? computeHoursDifference(schedule.start, schedule.end)
+        : 0;
+      const horasTrabajadas = computeHoursDifference(
+        record.entryTime,
+        exitTime,
+      );
+      const horasRestantesNumero = Math.max(
+        0,
+        Math.round((horasBloqueDelDia - horasTrabajadas) * 100) / 100,
+      );
+      const horasRestantes = formatDurationHoursWords(horasRestantesNumero);
+
+      await this.sheetsService.updateExit(
+        record.rowIndex,
+        exitTime,
+        ATTENDANCE_STATUS.INCOMPLETO,
+        horasTrabajadas,
+        horasRestantes,
+      );
+
+      await this.syncExitToDashboard(record.discordId, targetDate, exitTime);
+    }
+
+    if (openRecords.length > 0) {
+      logger.info(
+        `Cierre automático: ${openRecords.length} entrada(s) sin salida marcada(s) como Incompleto (${targetDate})`,
+      );
+    }
+
+    return openRecords.length;
   }
 
   private async syncEntryToDashboard(
@@ -178,14 +289,9 @@ export class AttendanceService {
   }
 
   private resolveStoredStatus(storedStatus: string): AttendanceStatus {
-    if (storedStatus === ATTENDANCE_STATUS.PUNTUAL) {
-      return ATTENDANCE_STATUS.PUNTUAL;
-    }
-
-    if (storedStatus === ATTENDANCE_STATUS.TARDANZA) {
-      return ATTENDANCE_STATUS.TARDANZA;
-    }
-
-    return ATTENDANCE_STATUS.SIN_REGISTRO;
+    const knownStatuses = Object.values(ATTENDANCE_STATUS) as string[];
+    return knownStatuses.includes(storedStatus)
+      ? (storedStatus as AttendanceStatus)
+      : ATTENDANCE_STATUS.SIN_REGISTRO;
   }
 }

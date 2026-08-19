@@ -1,5 +1,5 @@
 import { EmbedBuilder } from 'discord.js';
-import { BUSINESS_RULES } from '../config/business';
+import { WeeklySummary } from '../services/attendanceService';
 import {
   ATTENDANCE_STATUS_LABELS,
   EMBED_COLORS,
@@ -9,17 +9,20 @@ import {
   AttendanceStatus,
   AttendanceStatusResult,
 } from '../interfaces/attendance.interface';
+import { formatDurationHours, formatDurationHoursWords } from '../utils/date';
+
+function formatHoras(hours: number | null): string {
+  return hours === null ? EMPTY_DISPLAY_VALUE : formatDurationHoursWords(hours);
+}
 
 export function buildAttendancePanelEmbed(): EmbedBuilder {
-  const { start, end } = BUSINESS_RULES.entryWindow;
-
   return new EmbedBuilder()
     .setColor(EMBED_COLORS.INFO)
     .setTitle('Registro de asistencia')
     .setDescription(
       'Usa los botones de abajo para marcar tu entrada o salida del día.\n\n' +
-        `Horario de entrada: **${start}** – **${end}**.\n` +
-        'Para consultar tu estado del día, usa `/asistencia estado`.',
+        'Tu horario depende del día: usa `/asistencia estado` para ver tu registro de hoy ' +
+        'y `/asistencia semana` para ver tus horas acumuladas.',
     );
 }
 
@@ -44,6 +47,8 @@ export function buildEntrySuccessEmbed(
 export function buildExitSuccessEmbed(
   date: string,
   exitTime: string,
+  horasTrabajadas: number,
+  horasRestantes: string,
 ): EmbedBuilder {
   return new EmbedBuilder()
     .setColor(EMBED_COLORS.SUCCESS)
@@ -52,6 +57,16 @@ export function buildExitSuccessEmbed(
     .addFields(
       { name: 'Fecha', value: date, inline: true },
       { name: 'Hora', value: exitTime, inline: true },
+      {
+        name: 'Horas trabajadas',
+        value: formatDurationHoursWords(horasTrabajadas),
+        inline: true,
+      },
+      {
+        name: 'Horas restantes (hoy)',
+        value: horasRestantes,
+        inline: true,
+      },
     );
 }
 
@@ -70,17 +85,49 @@ export function buildAttendanceStatusEmbed(
       { name: 'Entrada', value: entry, inline: true },
       { name: 'Salida', value: exit, inline: true },
       { name: 'Estado', value: statusLabel, inline: false },
+      {
+        name: 'Horas trabajadas',
+        value: formatHoras(status.horasTrabajadas),
+        inline: true,
+      },
+      {
+        name: 'Horas restantes (hoy)',
+        value: status.horasRestantes ?? EMPTY_DISPLAY_VALUE,
+        inline: true,
+      },
     );
 }
 
-export function buildEntryHoursClosedEmbed(): EmbedBuilder {
-  const { start, end } = BUSINESS_RULES.entryWindow;
+function formatDiferencia(diferencia: number): string {
+  if (diferencia === 0) {
+    return 'Meta cumplida';
+  }
 
+  return diferencia > 0
+    ? `+${formatDurationHours(diferencia)} sobre la meta`
+    : `Faltan ${formatDurationHours(diferencia)}`;
+}
+
+export function buildWeeklySummaryEmbed(
+  nombre: string,
+  summary: WeeklySummary,
+): EmbedBuilder {
   return new EmbedBuilder()
-    .setColor(EMBED_COLORS.WARNING)
-    .setTitle('Horario de registro finalizado')
-    .setDescription(
-      `El registro de entrada solo está disponible entre las **${start}** y las **${end}**.\n\nIntenta nuevamente dentro del horario permitido.`,
+    .setColor(EMBED_COLORS.INFO)
+    .setTitle(`Horas de la semana — ${nombre}`)
+    .setDescription(`Semana del **${summary.startDate}** al **${summary.endDate}**`)
+    .addFields(
+      {
+        name: 'Acumuladas',
+        value: formatDurationHours(summary.horasAcumuladas),
+        inline: true,
+      },
+      { name: 'Meta', value: formatDurationHours(summary.meta), inline: true },
+      {
+        name: 'Diferencia',
+        value: formatDiferencia(summary.diferencia),
+        inline: true,
+      },
     );
 }
 

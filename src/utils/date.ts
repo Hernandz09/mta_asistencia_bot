@@ -41,6 +41,49 @@ export function computeHoursDifference(start: string, end: string): number {
   return Math.round((diffMinutes / 60) * 100) / 100;
 }
 
+/**
+ * Formatea una cantidad de horas decimales como texto legible: "45min" si
+ * es menos de una hora, "3h" si son horas exactas, "2h 30min" en el resto de
+ * los casos. El signo se ignora (usa el valor absoluto) — quien llama decide
+ * cómo comunicar si es un sobrante o un faltante.
+ */
+export function formatDurationHours(hours: number): string {
+  const totalMinutes = Math.round(Math.abs(hours) * 60);
+  const wholeHours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (wholeHours === 0) {
+    return `${minutes}min`;
+  }
+
+  if (minutes === 0) {
+    return `${wholeHours}h`;
+  }
+
+  return `${wholeHours}h ${minutes}min`;
+}
+
+/**
+ * Igual que `formatDurationHours` pero en palabras completas: "3 horas 25
+ * minutos", "6 horas", "13 minutos", "0 minutos". Usado donde el decimal
+ * (ej. "3.42h") resulta confuso de leer.
+ */
+export function formatDurationHoursWords(hours: number): string {
+  const totalMinutes = Math.round(Math.abs(hours) * 60);
+  const wholeHours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  const parts: string[] = [];
+  if (wholeHours > 0) {
+    parts.push(`${wholeHours} ${wholeHours === 1 ? 'hora' : 'horas'}`);
+  }
+  if (minutes > 0 || wholeHours === 0) {
+    parts.push(`${minutes} ${minutes === 1 ? 'minuto' : 'minutos'}`);
+  }
+
+  return parts.join(' ');
+}
+
 /** 1=lunes … 7=domingo, para una fecha YYYY-MM-DD ya localizada. */
 export function getWeekdayNumber(dateStr: string): number {
   const [year, month, day] = dateStr.split('-').map(Number);

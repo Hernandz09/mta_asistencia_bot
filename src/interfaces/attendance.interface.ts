@@ -11,6 +11,9 @@ export interface AttendanceRecord {
   entryTime: string;
   exitTime: string;
   status: string;
+  horasTrabajadas: number | null;
+  /** Texto ya formateado ("3 horas 25 minutos"), no un número — ver sheetsService. */
+  horasRestantes: string | null;
 }
 
 export interface AttendanceStatusResult {
@@ -18,4 +21,6 @@ export interface AttendanceStatusResult {
   entryTime: string | null;
   exitTime: string | null;
   status: AttendanceStatus;
+  horasTrabajadas: number | null;
+  horasRestantes: string | null;
 }

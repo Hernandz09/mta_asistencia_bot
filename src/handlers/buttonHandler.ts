@@ -6,7 +6,6 @@ import {
 } from 'discord.js';
 import { BUTTON_CUSTOM_IDS } from '../config/constants';
 import {
-  buildEntryHoursClosedEmbed,
   buildEntrySuccessEmbed,
   buildErrorEmbed,
   buildExitSuccessEmbed,
@@ -34,12 +33,13 @@ async function handleMarcarSalida(
   interaction: ButtonInteraction,
   attendanceService: AttendanceService,
 ): Promise<void> {
-  const { date, exitTime } = await attendanceService.registerExit(
-    interaction.user.id,
-  );
+  const { date, exitTime, horasTrabajadas, horasRestantes } =
+    await attendanceService.registerExit(interaction.user.id);
 
   await interaction.editReply({
-    embeds: [buildExitSuccessEmbed(date, exitTime)],
+    embeds: [
+      buildExitSuccessEmbed(date, exitTime, horasTrabajadas, horasRestantes),
+    ],
   });
 }
 
@@ -71,24 +71,33 @@ export function registerButtonHandler(
       await handleMarcarSalida(interaction, attendanceService);
     } catch (error) {
       const embed = isAttendanceError(error)
-        ? error.type === 'entry_hours_closed'
-          ? buildEntryHoursClosedEmbed()
-          : buildErrorEmbed(error.userMessage)
+        ? buildErrorEmbed(error.userMessage)
         : buildGenericErrorEmbed();
 
       if (!isAttendanceError(error)) {
         logger.error(`Error en botón ${customId}:`, error);
       }
 
-      if (interaction.deferred || interaction.replied) {
-        await interaction.editReply({ embeds: [embed] });
-        return;
-      }
+      try {
+        if (interaction.deferred || interaction.replied) {
+          await interaction.editReply({ embeds: [embed] });
+          return;
+        }
 
-      await interaction.reply({
-        embeds: [embed],
-        flags: MessageFlags.Ephemeral,
-      });
+        await interaction.reply({
+          embeds: [embed],
+          flags: MessageFlags.Ephemeral,
+        });
+      } catch (replyError) {
+        // El estado local de la interacción (deferred/replied) puede quedar
+        // desincronizado del servidor si el ack inicial falló por una
+        // condición de carrera (10062) pero sí llegó a registrarse en Discord.
+        // No dejar que esto tumbe el proceso.
+        logger.error(
+          `No se pudo responder al botón ${customId} tras un error:`,
+          replyError,
+        );
+      }
     }
   });
 }
