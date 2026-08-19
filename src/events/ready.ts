@@ -5,11 +5,14 @@ import {
   Message,
   TextChannel,
 } from 'discord.js';
+import { BUSINESS_RULES } from '../config/business';
 import { BUTTON_CUSTOM_IDS } from '../config/constants';
 import { AppConfig } from '../config/env';
 import { buildAttendanceButtonRow } from '../components/attendanceButtons';
 import { buildAttendancePanelEmbed } from '../embeds/response.embeds';
 import { AttendanceService } from '../services/attendanceService';
+import { scheduleAutoClose } from '../services/autoCloseJob';
+import { ScheduleService } from '../services/scheduleService';
 import { logger } from '../utils/logger';
 
 const PANEL_FETCH_LIMIT = 50;
@@ -90,11 +93,18 @@ async function ensureAttendancePanel(
 export function registerReadyWithInit(
   client: Client,
   attendanceService: AttendanceService,
+  scheduleService: ScheduleService,
   config: AppConfig,
 ): void {
   client.once(Events.ClientReady, async (readyClient) => {
     try {
       await attendanceService.initialize();
+      await scheduleService.initialize();
+      scheduleAutoClose(
+        attendanceService,
+        config.timezone,
+        BUSINESS_RULES.autoClose.cronExpression,
+      );
       await ensureAttendancePanel(
         readyClient,
         config.discord.attendanceChannelId,

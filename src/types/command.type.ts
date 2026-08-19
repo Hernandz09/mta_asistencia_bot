@@ -5,6 +5,7 @@ import {
   SlashCommandSubcommandsOnlyBuilder,
 } from 'discord.js';
 import { AttendanceService } from '../services/attendanceService';
+import { ScheduleService } from '../services/scheduleService';
 
 export type SlashCommandData =
   | SlashCommandBuilder
@@ -12,10 +13,16 @@ export type SlashCommandData =
   | SlashCommandOptionsOnlyBuilder
   | Omit<SlashCommandBuilder, 'addSubcommand' | 'addSubcommandGroup'>;
 
+export interface CommandContext {
+  attendanceService: AttendanceService;
+  scheduleService: ScheduleService;
+  adminRoleId?: string;
+}
+
 export interface BotCommand {
   data: SlashCommandData;
   execute: (
     interaction: ChatInputCommandInteraction,
-    attendanceService: AttendanceService,
+    context: CommandContext,
   ) => Promise<void>;
 }

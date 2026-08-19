@@ -1,7 +1,6 @@
 import { Client, Events } from 'discord.js';
 import { asistenciaCommand } from '../commands/asistencia';
-import { AttendanceService } from '../services/attendanceService';
-import { BotCommand } from '../types/command.type';
+import { BotCommand, CommandContext } from '../types/command.type';
 
 const commands: BotCommand[] = [asistenciaCommand];
 
@@ -15,7 +14,7 @@ export function getCommandsData() {
 
 export function registerCommandHandler(
   client: Client,
-  attendanceService: AttendanceService,
+  context: CommandContext,
 ): void {
   client.on(Events.InteractionCreate, async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
@@ -23,6 +22,6 @@ export function registerCommandHandler(
     const command = commandsByName.get(interaction.commandName);
     if (!command) return;
 
-    await command.execute(interaction, attendanceService);
+    await command.execute(interaction, context);
   });
 }
