@@ -124,8 +124,8 @@ src/
 ### 1. Clonar e instalar
 
 ```bash
-git clone https://github.com/Hernandz09/mta-attendance-bot.git
-cd mta-attendance-bot
+git clone https://github.com/Hernandz09/mta_asistencia_bot.git
+cd mta_asistencia_bot
 npm install
 cp .env.example .env
 ```
@@ -166,6 +166,15 @@ npm run dev               # desarrollo
 # o
 npm run build && npm start
 ```
+
+---
+
+## Despliegue en Replit
+
+1. **Importar el repo** — En [replit.com](https://replit.com), *Create App → Import from GitHub* y pega la URL de este repositorio.
+2. **Secrets** — En el panel *Secrets* (candado, no `.env`) carga cada variable de `.env.example` con sus valores reales: `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`, `ATTENDANCE_CHANNEL_ID`, `DISCORD_GUILD_ID`, `ADMIN_ROLE_ID`, `GOOGLE_SHEETS_ID`, `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PRIVATE_KEY` (con los `\n` literales tal como en `.env.example`), `DASHBOARD_API_URL`, `ATTENDANCE_BOT_API_KEY`, `TIMEZONE`.
+3. **Ejecutar** — El botón *Run* usa el `.replit` del repo (`npm run build && npm start`). Antes de la primera corrida, registra los comandos: abre el Shell de Replit y ejecuta `npm run deploy-commands`.
+4. **Dejarlo siempre activo** — Un bot de Discord necesita el proceso corriendo 24/7, no solo mientras el editor está abierto. Usa *Deploy → Reserved VM Deployment* (mantiene el proceso vivo permanentemente; no requiere servidor HTTP). La opción *Autoscale* no aplica aquí porque no es un servicio que responda a HTTP requests.
 
 ---
 

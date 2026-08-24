@@ -1,0 +1,7 @@
+entrypoint = "src/index.ts"
+modules = ["nodejs-20"]
+
+run = "npm run build && npm start"
+
+[nix]
+channel = "stable-23_11"
