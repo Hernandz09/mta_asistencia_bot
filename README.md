@@ -178,6 +178,16 @@ npm run build && npm start
 
 ---
 
+## Despliegue en Railway
+
+1. **Nuevo proyecto** — En [railway.app](https://railway.app), *New Project → Deploy from GitHub repo* y selecciona este repositorio (`Hernandz09/mta_asistencia_bot`).
+2. **Variables** — En la pestaña *Variables* del servicio, carga cada valor de `.env.example`: `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`, `ATTENDANCE_CHANNEL_ID`, `DISCORD_GUILD_ID`, `ADMIN_ROLE_ID`, `GOOGLE_SHEETS_ID`, `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PRIVATE_KEY` (pega la clave con los `\n` literales, tal como en `.env.example`), `DASHBOARD_API_URL`, `ATTENDANCE_BOT_API_KEY`, `TIMEZONE`.
+3. **Build y arranque** — Railway detecta Node.js con Nixpacks y usa `railway.json`: instala dependencias, corre `npm run build` (por el script `build` en `package.json`) y arranca con `npm start`. No requiere puerto HTTP: es un proceso worker conectado al gateway de Discord.
+4. **Registrar comandos** — Antes de la primera ejecución (o tras cambiar comandos), corre `npm run deploy-commands` una vez desde tu máquina local con las mismas variables de Discord, o usa la consola *Shell* de Railway sobre el servicio ya desplegado.
+5. **Mantenerlo activo** — Con un servicio de tipo *Worker* (sin dominio público), Railway lo mantiene corriendo 24/7 y lo reinicia automáticamente ante fallos (`restartPolicyType: ON_FAILURE` en `railway.json`).
+
+---
+
 ## Scripts
 
 | Script | Descripción |
