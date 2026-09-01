@@ -1,7 +1,11 @@
 import { BUSINESS_RULES } from '../config/business';
 import { ATTENDANCE_STATUS } from '../config/constants';
 import { AttendanceStatus } from '../interfaces/attendance.interface';
-import { getWeekdayNumber, parseTimeToMinutes } from '../utils/date';
+import {
+  computeHoursDifference,
+  getWeekdayNumber,
+  parseTimeToMinutes,
+} from '../utils/date';
 import { logger } from '../utils/logger';
 
 const TIME_FORMAT = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -24,6 +28,30 @@ export interface ScheduleEntry {
   start: string;
   end: string;
 }
+
+export interface WeeklyDaySchedule {
+  dia: number;
+  label: string;
+  start: string | null;
+  end: string | null;
+  hours: number;
+}
+
+export interface WeeklySchedule {
+  nombre: string;
+  days: WeeklyDaySchedule[];
+  totalHours: number;
+}
+
+const WEEKDAY_LABELS = [
+  '',
+  'Lunes',
+  'Martes',
+  'Miércoles',
+  'Jueves',
+  'Viernes',
+  'Sábado',
+] as const;
 
 export interface ScheduleParseResult {
   entries: ScheduleEntry[];
@@ -219,6 +247,46 @@ export class ScheduleService {
         errors: ['No se pudieron leer los horarios (ver logs del bot).'],
       };
     }
+  }
+
+  getWeeklySchedule(discordId: string): WeeklySchedule | null {
+    const entries = this.cache.get(discordId);
+    if (!entries || entries.length === 0) {
+      return null;
+    }
+
+    const byDay = new Map(entries.map((entry) => [entry.dia, entry]));
+    const days: WeeklyDaySchedule[] = [];
+    let totalHours = 0;
+
+    for (let dia = 1; dia <= 6; dia++) {
+      const entry = byDay.get(dia);
+      if (entry) {
+        const hours = computeHoursDifference(entry.start, entry.end);
+        totalHours += hours;
+        days.push({
+          dia,
+          label: WEEKDAY_LABELS[dia],
+          start: entry.start,
+          end: entry.end,
+          hours,
+        });
+      } else {
+        days.push({
+          dia,
+          label: WEEKDAY_LABELS[dia],
+          start: null,
+          end: null,
+          hours: 0,
+        });
+      }
+    }
+
+    return {
+      nombre: entries[0]?.nombre?.trim() || 'Practicante',
+      days,
+      totalHours: Math.round(totalHours * 100) / 100,
+    };
   }
 
   getSchedule(discordId: string, dateStr: string): ScheduleBlock | null {

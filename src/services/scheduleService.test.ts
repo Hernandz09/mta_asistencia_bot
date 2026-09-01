@@ -146,6 +146,37 @@ describe('ScheduleService', () => {
     expect(service.getSchedule('123', '2026-08-18')).toBeNull(); // martes: sin bloque
   });
 
+  it('arma el horario semanal con descansos y el total de horas', async () => {
+    const service = new ScheduleService(
+      fakeRepository([
+        ['123', 'Janeth Saca', '1', '15:00', '21:00'],
+        ['123', 'Janeth Saca', '2', '09:00', '15:00'],
+        ['123', 'Janeth Saca', '4', '09:00', '15:00'],
+        ['123', 'Janeth Saca', '5', '09:00', '15:00'],
+        ['123', 'Janeth Saca', '6', '09:00', '15:00'],
+      ]),
+      30,
+    );
+    await service.initialize();
+
+    const weekly = service.getWeeklySchedule('123');
+    expect(weekly?.nombre).toBe('Janeth Saca');
+    expect(weekly?.totalHours).toBe(30);
+    expect(weekly?.days[0]).toMatchObject({
+      label: 'Lunes',
+      start: '15:00',
+      end: '21:00',
+      hours: 6,
+    });
+    expect(weekly?.days[2]).toMatchObject({
+      label: 'Miércoles',
+      start: null,
+      end: null,
+      hours: 0,
+    });
+    expect(service.getWeeklySchedule('999')).toBeNull();
+  });
+
   it('devuelve null para un discord_id desconocido', async () => {
     const service = new ScheduleService(fakeRepository([]), 30);
     await service.initialize();

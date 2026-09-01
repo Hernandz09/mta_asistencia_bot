@@ -16,6 +16,7 @@ import { syncBotAvatar } from '../services/botProfileService';
 import { RankingService } from '../services/rankingService';
 import { scheduleAutoClose, scheduleRankingSnapshots } from '../services/autoCloseJob';
 import { ScheduleService } from '../services/scheduleService';
+import { syncSlashCommands } from '../discord/syncSlashCommands';
 import { logger } from '../utils/logger';
 
 const PANEL_FETCH_LIMIT = 50;
@@ -124,6 +125,11 @@ export function registerReadyWithInit(
         readyClient,
         config.discord.attendanceChannelId,
       );
+      try {
+        await syncSlashCommands(readyClient, config.discord);
+      } catch (error) {
+        logger.warn('No se pudieron actualizar los slash commands:', error);
+      }
       logger.info(`Bot conectado como ${readyClient.user.tag}`);
       logger.info('Almacenamiento principal: MySQL (Sheets solo emergencia)');
     } catch (error) {

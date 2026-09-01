@@ -21,8 +21,9 @@ export function buildAttendancePanelEmbed(): EmbedBuilder {
     .setTitle('Registro de asistencia')
     .setDescription(
       'Usa los botones de abajo para marcar tu entrada o salida del día.\n\n' +
-        'Tu horario depende del día: usa `/stats` para ver tu desempeño, ' +
-        '`/asistencia estado` para el registro de hoy y `/asistencia semana` para las horas acumuladas.',
+        'Tu horario depende del día: usa `/horario` para verlo, ' +
+        '`/stats` para tu desempeño, `/asistencia estado` para el registro de hoy ' +
+        'y `/asistencia semana` para las horas acumuladas.',
     );
 }
 

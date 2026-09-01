@@ -303,7 +303,13 @@ export class BotStateService {
     if (isAdmin && estado.permitirAdmins) {
       return { allowed: true, estado };
     }
-    const readCommands = new Set(['stats', 'estadisticas', 'asistencia', 'top']);
+    const readCommands = new Set([
+      'stats',
+      'estadisticas',
+      'asistencia',
+      'top',
+      'horario',
+    ]);
     return { allowed: readCommands.has(commandName), estado };
   }
 

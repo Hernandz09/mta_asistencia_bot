@@ -13,6 +13,7 @@ import {
   buildWeeklySummaryEmbed,
 } from '../embeds/response.embeds';
 import { BotCommand, CommandContext } from '../types/command.type';
+import { executeHorario } from './horario';
 import { isAttendanceError } from '../utils/errors';
 import { logger } from '../utils/logger';
 
@@ -30,6 +31,17 @@ const data = new SlashCommandBuilder()
         option
           .setName('practicante')
           .setDescription('Practicante a consultar (solo admins)')
+          .setRequired(false),
+      ),
+  )
+  .addSubcommand((sub) =>
+    sub
+      .setName('horario')
+      .setDescription('Ver tu horario semanal de prácticas')
+      .addUserOption((option) =>
+        option
+          .setName('usuario')
+          .setDescription('Practicante a consultar (solo encargado / admin)')
           .setRequired(false),
       ),
   )
@@ -74,6 +86,9 @@ async function execute(
         break;
       case 'semana':
         await handleSemana(interaction, context);
+        break;
+      case 'horario':
+        await executeHorario(interaction, context);
         break;
       case 'recargar':
         await handleRecargar(interaction, context);
