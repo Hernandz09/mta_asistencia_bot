@@ -268,7 +268,7 @@ CREATE TABLE IF NOT EXISTS horas_extra (
   creado_por_discord VARCHAR(32) NULL,
   creado_en DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id),
-  KEY ix_horas_extra_prac_fecha (practicante_id, fecha),
+  UNIQUE KEY uq_horas_extra_prac_fecha (practicante_id, fecha),
   CONSTRAINT fk_horas_extra_practicante
     FOREIGN KEY (practicante_id) REFERENCES practicantes (id)
     ON UPDATE CASCADE ON DELETE RESTRICT

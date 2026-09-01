@@ -462,7 +462,7 @@ export function mergeExtraHoursDetalle(
       return {
         fecha: item.fecha,
         horas: item.horas,
-        label: `${formatDateEs(item.fecha)}  ⚡ Extra${suffix}  ·  ${formatHoursShort(item.horas)} h`,
+        label: `${formatDateEs(item.fecha)}  ⚡ Extra  ·  ${formatHoursShort(item.horas)} h${suffix}`,
       };
     });
   return [...detalle, ...extraLines].sort((a, b) => {

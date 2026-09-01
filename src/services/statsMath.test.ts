@@ -432,7 +432,7 @@ describe('buildPeriodDetalle', () => {
     ]);
   });
 
-  it('agrega las horas extra al detalle del día', () => {
+  it('agrega las horas extra al detalle sin reemplazar el estado del día', () => {
     const merged = mergeExtraHoursDetalle(
       [
         {
@@ -445,7 +445,7 @@ describe('buildPeriodDetalle', () => {
     );
     expect(merged.map((item) => item.label)).toEqual([
       '01/09/2026  ❌ Falta  ·  0 h',
-      '01/09/2026  ⚡ Extra (reunión)  ·  2.5 h',
+      '01/09/2026  ⚡ Extra  ·  2.5 h (reunión)',
     ]);
   });
 });

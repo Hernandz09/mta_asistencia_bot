@@ -12,6 +12,7 @@ import {
   getMonthRange,
   getPreviousCalendarMonthRange,
   getWeekdayNumber,
+  parseBusinessDate,
 } from './date';
 
 describe('formatDurationHoursWords', () => {
@@ -177,5 +178,24 @@ describe('formatLimaIso', () => {
     expect(formatLimaIso(new Date('2026-09-01T14:00:07.000Z'))).toBe(
       '2026-09-01T09:00:07-05:00',
     );
+  });
+});
+
+describe('parseBusinessDate', () => {
+  it('acepta hoy, ISO y día/mes', () => {
+    expect(parseBusinessDate(null, '2026-09-01')).toBe('2026-09-01');
+    expect(parseBusinessDate('hoy', '2026-09-01')).toBe('2026-09-01');
+    expect(parseBusinessDate('2026-08-31', '2026-09-01')).toBe('2026-08-31');
+    expect(parseBusinessDate('31/08', '2026-09-01')).toBe('2026-08-31');
+    expect(parseBusinessDate('31/08/2026', '2026-09-01')).toBe('2026-08-31');
+  });
+
+  it('si el día/mes aún no llega, usa el año anterior', () => {
+    expect(parseBusinessDate('31/12', '2026-01-05')).toBe('2025-12-31');
+  });
+
+  it('rechaza fechas imposibles', () => {
+    expect(parseBusinessDate('31/02/2026', '2026-09-01')).toBeNull();
+    expect(parseBusinessDate('ayer', '2026-09-01')).toBeNull();
   });
 });

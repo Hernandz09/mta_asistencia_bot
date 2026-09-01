@@ -36,6 +36,65 @@ export function formatPunchClock(
   return getCurrentTime(timezone, utc);
 }
 
+/**
+ * Convierte `hoy`, `31/08`, `31/08/2026` o `2026-08-31` a YYYY-MM-DD.
+ * Si no hay año, usa el de `today`; si esa fecha aún no llega, prueba el año anterior.
+ */
+export function parseBusinessDate(
+  raw: string | null | undefined,
+  today: string,
+): string | null {
+  if (raw == null || !raw.trim()) return today;
+  const input = raw.trim().toLowerCase();
+  if (input === 'hoy' || input === 'today') return today;
+
+  const iso = input.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (iso) {
+    return normalizeIsoDate(iso[1], iso[2], iso[3]);
+  }
+
+  const dmy = input.match(/^(\d{1,2})[/\-.](\d{1,2})(?:[/\-.](\d{2,4}))?$/);
+  if (!dmy) return null;
+
+  const day = dmy[1];
+  const month = dmy[2];
+  let year = dmy[3];
+  if (!year) {
+    const currentYear = today.slice(0, 4);
+    const candidate = normalizeIsoDate(currentYear, month, day);
+    if (candidate && candidate > today) {
+      return normalizeIsoDate(String(Number(currentYear) - 1), month, day);
+    }
+    return candidate;
+  }
+  if (year.length === 2) {
+    year = `20${year}`;
+  }
+  return normalizeIsoDate(year, month, day);
+}
+
+function normalizeIsoDate(
+  yearText: string,
+  monthText: string,
+  dayText: string,
+): string | null {
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return null;
+  }
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return formatUtcDate(date);
+}
+
 /** ISO local America/Lima (UTC−5, sin DST). */
 export function formatLimaIso(utc: Date): string {
   return `${getTodayDate('America/Lima', utc)}T${getCurrentTime('America/Lima', utc)}-05:00`;
