@@ -13,6 +13,7 @@ import { ScheduleService } from './services/scheduleService';
 import { SheetsService } from './services/sheetsService';
 import { ConfigService } from './services/configService';
 import { ErpReadService } from './services/erpReadService';
+import { ExtraHoursService } from './services/extraHoursService';
 import { RankingService } from './services/rankingService';
 import { StatsService } from './services/statsService';
 import { CommandContext } from './types/command.type';
@@ -36,12 +37,22 @@ async function main(): Promise<void> {
   );
   const configService = new ConfigService(pool);
   const erpReadService = new ErpReadService(pool, config.timezone);
+  const extraHoursService = new ExtraHoursService(pool);
+  try {
+    await extraHoursService.ensureSchema();
+  } catch (error) {
+    logger.error(
+      'No se pudo crear la tabla horas_extra. /horas add no funcionará hasta que exista.',
+      error,
+    );
+  }
   const rankingService = new RankingService(pool, config.timezone, configService);
   const statsService = new StatsService(
     pool,
     config.timezone,
     configService,
     rankingService,
+    extraHoursService,
   );
   const botStateService = new BotStateService(pool);
 
@@ -54,6 +65,7 @@ async function main(): Promise<void> {
     scheduleService,
     statsService,
     rankingService,
+    extraHoursService,
     botStateService,
     adminRoleId: config.discord.adminRoleId,
     attendanceChannelId: config.discord.attendanceChannelId,

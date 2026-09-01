@@ -7,6 +7,7 @@ import {
 import { AttendanceService } from '../services/attendanceService';
 import { BotStateService } from '../services/botStateService';
 import { ScheduleService } from '../services/scheduleService';
+import { ExtraHoursService } from '../services/extraHoursService';
 import { RankingService } from '../services/rankingService';
 import { StatsService } from '../services/statsService';
 
@@ -21,6 +22,7 @@ export interface CommandContext {
   scheduleService: ScheduleService;
   statsService: StatsService;
   rankingService: RankingService;
+  extraHoursService?: ExtraHoursService;
   botStateService: BotStateService;
   adminRoleId?: string;
   attendanceChannelId?: string;

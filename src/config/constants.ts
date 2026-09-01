@@ -80,6 +80,7 @@ export const COMMAND_NAMES = {
   STATUS: 'status',
   TOP: 'top',
   HORARIO: 'horario',
+  HORAS: 'horas',
 } as const;
 
 export const BUTTON_CUSTOM_IDS = {

@@ -16,11 +16,14 @@ import {
   computeLevel,
   effectiveWindow,
   formatDateEs,
+  mergeExtraHoursDetalle,
   monthLabelEs,
+  round1,
   sinceDaySuffix,
   summarizePeriod,
 } from './statsMath';
 import { ConfigService } from './configService';
+import { ExtraHoursService } from './extraHoursService';
 import { RankingService } from './rankingService';
 
 const CACHE_TTL_MS = 60_000;
@@ -113,6 +116,7 @@ export class StatsService {
     private readonly timezone: string,
     private readonly configService?: ConfigService,
     private readonly rankingService?: RankingService,
+    private readonly extraHoursService?: ExtraHoursService,
   ) {}
 
   async findPracticanteByDiscord(
@@ -191,6 +195,15 @@ export class StatsService {
     }
   }
 
+  invalidatePracticante(practicanteId: number): void {
+    const prefix = `${practicanteId}:`;
+    for (const key of this.cache.keys()) {
+      if (key.startsWith(prefix)) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
   private async buildResumen(
     practicante: StatsPracticante,
     periodo: StatsPeriod,
@@ -211,7 +224,7 @@ export class StatsService {
 
     const loadStart = window?.start ?? nominal.startDate;
     const loadEnd = nominal.endDate;
-    const [horario, jornadas, allTimeHours, recup, horasSemana, feriados, weights, hoursPerLevel, contarDiaEnCurso] =
+    const [horario, jornadas, allTimeHours, recup, horasSemana, feriados, weights, hoursPerLevel, contarDiaEnCurso, extrasPeriodo] =
       await Promise.all([
         this.loadHorario(practicante.id),
         this.loadJornadas(practicante.id, loadStart, loadEnd),
@@ -222,6 +235,7 @@ export class StatsService {
         this.configService?.getNoteWeights() ?? Promise.resolve(undefined),
         this.configService?.getHoursPerLevel() ?? Promise.resolve(undefined),
         this.configService?.getContarDiaEnCurso() ?? Promise.resolve(false),
+        this.loadExtras(practicante.id, loadStart, loadEnd),
       ]);
 
     const summarizeDates = window
@@ -298,13 +312,33 @@ export class StatsService {
       }
     }
 
+    const extrasInWindow = extrasPeriodo.filter((item) => {
+      if (!window) return false;
+      return item.fecha >= window.start && item.fecha <= window.end;
+    });
+    const extraHours = extrasInWindow.reduce((sum, item) => sum + item.horas, 0);
+    if (extraHours > 0) {
+      summary.horasAcumuladas = round1(summary.horasAcumuladas + extraHours);
+      summary.sinRegistros = false;
+      if (summary.horasProgramadas > 0) {
+        const pctHorasRaw = Math.min(
+          100,
+          round1((summary.horasAcumuladas / summary.horasProgramadas) * 100),
+        );
+        summary.pctHoras = pctHorasRaw;
+      }
+    }
+
     const detalle = window
-      ? buildPeriodDetalle(
-          summarizeDates,
-          jornadas,
-          horario.dias,
-          horario.refrigerioMin,
-          ctx,
+      ? mergeExtraHoursDetalle(
+          buildPeriodDetalle(
+            summarizeDates,
+            jornadas,
+            horario.dias,
+            horario.refrigerioMin,
+            ctx,
+          ),
+          extrasInWindow,
         )
       : [];
 
@@ -467,6 +501,19 @@ export class StatsService {
     return rows.map((row) => this.mapJornada(row));
   }
 
+  private async loadExtras(
+    practicanteId: number,
+    startDate: string,
+    endDate: string,
+  ) {
+    if (!this.extraHoursService) return [];
+    return this.extraHoursService.listBetween(
+      practicanteId,
+      startDate,
+      endDate,
+    );
+  }
+
   private async loadAllTimeHours(practicanteId: number): Promise<number> {
     const [rows] = await this.pool.query<RowDataPacket[]>(
       `SELECT ROUND(COALESCE(SUM(horas_computadas + horas_justificadas), 0), 1) AS total
@@ -474,7 +521,11 @@ export class StatsService {
        WHERE practicante_id = ? AND contexto = 'REGULAR'`,
       [practicanteId],
     );
-    return Number(rows[0]?.total ?? 0);
+    const jornadas = Number(rows[0]?.total ?? 0);
+    const extras = this.extraHoursService
+      ? await this.extraHoursService.sumBetween(practicanteId)
+      : 0;
+    return round1(jornadas + extras);
   }
 
   private async loadHorasSemana(practicanteId: number): Promise<number> {
@@ -488,7 +539,15 @@ export class StatsService {
          AND estado_jornada NOT IN ('NO_LABORABLE', 'VACACIONES', 'LICENCIA')`,
       [practicanteId, week.startDate, week.endDate],
     );
-    return Number(rows[0]?.total ?? 0);
+    const jornadas = Number(rows[0]?.total ?? 0);
+    const extras = this.extraHoursService
+      ? await this.extraHoursService.sumBetween(
+          practicanteId,
+          week.startDate,
+          week.endDate,
+        )
+      : 0;
+    return round1(jornadas + extras);
   }
 
   private async loadRecuperaciones(

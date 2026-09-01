@@ -5,6 +5,7 @@ import {
   computeNota,
   effectiveWindow,
   formatHoursShort,
+  mergeExtraHoursDetalle,
   notaColor,
   notaLabel,
   sinceDaySuffix,
@@ -428,6 +429,23 @@ describe('buildPeriodDetalle', () => {
       '03/09/2026  ⏳ Pendiente  ·  0 h',
       '04/09/2026  ⏳ Pendiente  ·  0 h',
       '05/09/2026  ⏳ Pendiente  ·  0 h',
+    ]);
+  });
+
+  it('agrega las horas extra al detalle del día', () => {
+    const merged = mergeExtraHoursDetalle(
+      [
+        {
+          fecha: '2026-09-01',
+          label: '01/09/2026  ❌ Falta  ·  0 h',
+          horas: 0,
+        },
+      ],
+      [{ fecha: '2026-09-01', horas: 2.5, motivo: 'reunión' }],
+    );
+    expect(merged.map((item) => item.label)).toEqual([
+      '01/09/2026  ❌ Falta  ·  0 h',
+      '01/09/2026  ⚡ Extra (reunión)  ·  2.5 h',
     ]);
   });
 });

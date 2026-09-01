@@ -147,13 +147,21 @@ export class MysqlAttendanceStore {
     endDate: string,
   ): Promise<number> {
     const [rows] = await this.pool.query<RowDataPacket[]>(
-      `SELECT ROUND(COALESCE(SUM(horas_computadas), 0), 2) AS total
+      `SELECT ROUND(
+          COALESCE(SUM(horas_computadas + horas_justificadas), 0)
+          + COALESCE((
+              SELECT SUM(horas)
+              FROM horas_extra
+              WHERE practicante_id = ?
+                AND fecha BETWEEN ? AND ?
+            ), 0)
+        , 2) AS total
        FROM jornadas
        WHERE practicante_id = ?
          AND fecha BETWEEN ? AND ?
          AND contexto = 'REGULAR'
          AND estado_jornada NOT IN ('NO_LABORABLE', 'VACACIONES', 'LICENCIA')`,
-      [practicanteId, startDate, endDate],
+      [practicanteId, startDate, endDate, practicanteId, startDate, endDate],
     );
     return Number(rows[0]?.total ?? 0);
   }

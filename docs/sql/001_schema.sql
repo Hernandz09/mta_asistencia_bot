@@ -258,6 +258,22 @@ CREATE TABLE IF NOT EXISTS justificaciones (
     ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS horas_extra (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  practicante_id BIGINT UNSIGNED NOT NULL,
+  fecha DATE NOT NULL,
+  horas DECIMAL(6, 2) NOT NULL,
+  motivo VARCHAR(400) NULL,
+  origen VARCHAR(32) NOT NULL DEFAULT 'bot',
+  creado_por_discord VARCHAR(32) NULL,
+  creado_en DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  KEY ix_horas_extra_prac_fecha (practicante_id, fecha),
+  CONSTRAINT fk_horas_extra_practicante
+    FOREIGN KEY (practicante_id) REFERENCES practicantes (id)
+    ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS feriados (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   fecha DATE NOT NULL,

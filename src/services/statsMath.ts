@@ -449,3 +449,27 @@ export function buildPeriodDetalle(
 
   return items;
 }
+
+export function mergeExtraHoursDetalle(
+  detalle: PeriodDayDetail[],
+  extras: Array<{ fecha: string; horas: number; motivo?: string | null }>,
+): PeriodDayDetail[] {
+  const extraLines: PeriodDayDetail[] = extras
+    .filter((item) => item.horas > 0)
+    .map((item) => {
+      const motivo = item.motivo?.trim();
+      const suffix = motivo ? ` (${motivo})` : '';
+      return {
+        fecha: item.fecha,
+        horas: item.horas,
+        label: `${formatDateEs(item.fecha)}  ⚡ Extra${suffix}  ·  ${formatHoursShort(item.horas)} h`,
+      };
+    });
+  return [...detalle, ...extraLines].sort((a, b) => {
+    const byDate = a.fecha.localeCompare(b.fecha);
+    if (byDate !== 0) return byDate;
+    const aExtra = a.label.includes('⚡ Extra') ? 1 : 0;
+    const bExtra = b.label.includes('⚡ Extra') ? 1 : 0;
+    return aExtra - bExtra || a.label.localeCompare(b.label);
+  });
+}
