@@ -1,11 +1,10 @@
 import {
-  ActivitiesOptions,
   ActivityType,
   Client,
   PresenceStatusData,
 } from 'discord.js';
 import { Pool, RowDataPacket } from 'mysql2/promise';
-import { MTA_BRAND_NAME, MTA_TAGLINE } from '../config/branding';
+import { MTA_TAGLINE } from '../config/branding';
 import { BOT_VERSION } from '../config/constants';
 import { logger } from '../utils/logger';
 
@@ -56,7 +55,7 @@ const PRESENCE: Record<
 > = {
   ACTIVO: {
     status: 'online',
-    activity: MTA_BRAND_NAME,
+    activity: MTA_TAGLINE,
     type: ActivityType.Playing,
   },
   MANTENIMIENTO: {
@@ -74,7 +73,7 @@ const PRESENCE: Record<
 export class BotStateService {
   private cached: { value: BotEstado; expiresAt: number } | null = null;
   private pollTimer: NodeJS.Timeout | null = null;
-  private lastApplied: BotEstadoNombre | null = null;
+  private lastAppliedKey: string | null = null;
   private client: Client | null = null;
   private tableMissing = false;
 
@@ -347,24 +346,17 @@ export class BotStateService {
   }
 
   async applyPresence(estado: BotEstadoNombre): Promise<void> {
-    if (!this.client?.user || this.lastApplied === estado) {
+    const presence = PRESENCE[estado];
+    const appliedKey = `${estado}:${presence.type}:${presence.activity}`;
+    if (!this.client?.user || this.lastAppliedKey === appliedKey) {
       return;
     }
-    const presence = PRESENCE[estado];
-    const activity: ActivitiesOptions =
-      presence.type === ActivityType.Playing
-        ? {
-            name: presence.activity,
-            state: MTA_TAGLINE,
-            type: ActivityType.Playing,
-          }
-        : { name: presence.activity, type: presence.type };
     await this.client.user.setPresence({
       status: presence.status,
-      activities: [activity],
+      activities: [{ name: presence.activity, type: presence.type }],
     });
-    this.lastApplied = estado;
-    logger.info(`Presencia Discord: ${estado} — ${presence.activity}`);
+    this.lastAppliedKey = appliedKey;
+    logger.info(`Presencia Discord: ${estado} — Jugando ${presence.activity}`);
   }
 
   private mapRow(row: RowDataPacket): BotEstado {
