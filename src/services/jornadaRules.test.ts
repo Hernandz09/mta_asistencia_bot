@@ -1,4 +1,8 @@
-import { calcularJornada, SPEC_TOLERANCES } from './jornadaRules';
+import {
+  calcularJornada,
+  cerrarJornadaSinSalida,
+  SPEC_TOLERANCES,
+} from './jornadaRules';
 import { describe, expect, it } from 'vitest';
 
 describe('calcularJornada (ESPEC-ASIS-001)', () => {
@@ -24,11 +28,12 @@ describe('calcularJornada (ESPEC-ASIS-001)', () => {
     expect(r.minutosTardanza).toBe(0);
   });
 
-  it('8:06 → TARDANZA de 6 min, computa desde la marca real', () => {
+  it('8:06 → TARDANZA de 6 min, horas completas y sin justificar', () => {
     const r = calcularJornada('08:06', '15:00', H, S);
     expect(r.estadoEntrada).toBe('TARDANZA');
     expect(r.minutosTardanza).toBe(6);
-    expect(r.horasComputadas).toBe(6.9);
+    expect(r.horasComputadas).toBe(7);
+    expect(r.horasPorJustificar).toBe(0);
   });
 
   it('salida a las 14:30 → SALIDA_ANTICIPADA', () => {
@@ -49,11 +54,28 @@ describe('calcularJornada (ESPEC-ASIS-001)', () => {
     expect(r.horasComputadas).toBe(7);
   });
 
-  it('sin salida → horas_computadas 0 y por justificar = programadas', () => {
+  it('jornada abierta sin salida → horas 0 y por justificar = programadas', () => {
     const r = calcularJornada('08:00', null, H, S);
     expect(r.estadoSalida).toBe('SIN_SALIDA');
+    expect(r.estadoJornada).toBe('ABIERTA');
     expect(r.horasComputadas).toBe(0);
     expect(r.horasPorJustificar).toBe(7);
+  });
+
+  it('tardanza + cierre sin salida → cuenta las horas, justificar es opcional', () => {
+    const r = calcularJornada('08:06', '18:10', H, S);
+    expect(r.estadoEntrada).toBe('TARDANZA');
+    expect(r.estadoSalida).toBe('SIN_SALIDA');
+    expect(r.horasComputadas).toBe(7);
+    expect(r.horasPorJustificar).toBe(0);
+  });
+
+  it('cierre automático con tardanza cuenta el turno y no exige justificar', () => {
+    const r = cerrarJornadaSinSalida('08:08', H, S);
+    expect(r.estadoEntrada).toBe('TARDANZA');
+    expect(r.estadoJornada).toBe('CERRADA');
+    expect(r.horasComputadas).toBe(7);
+    expect(r.horasPorJustificar).toBe(0);
   });
 
   it('usa las tolerancias de la spec por defecto', () => {

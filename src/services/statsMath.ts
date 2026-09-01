@@ -377,3 +377,67 @@ export function detalleEstadoLabel(jornada: JornadaStatsRow): string {
   if (jornada.estadoJornada === 'ABIERTA') return '🔵 Abierta';
   return '📌 Cerrada';
 }
+
+export interface PeriodDayDetail {
+  fecha: string;
+  label: string;
+  horas: number;
+}
+
+function detalleLine(row: JornadaStatsRow): string {
+  const hours = row.horasComputadas + row.horasJustificadas;
+  return `${formatDateEs(row.fecha)}  ${detalleEstadoLabel(row)}  ·  ${formatHoursShort(hours)} h`;
+}
+
+/**
+ * Desglose día a día del periodo, alineado con el resumen.
+ * Incluye faltas de días laborables sin jornada (no solo filas guardadas).
+ */
+export function buildPeriodDetalle(
+  dates: string[],
+  jornadas: JornadaStatsRow[],
+  dias: HorarioDiaStats[],
+  refrigerioMin: number,
+  context: SummarizeContext,
+): PeriodDayDetail[] {
+  const feriados = context.feriados ?? new Set<string>();
+  const tolerancia = context.toleranciaEntradaMin ?? 5;
+  const byDate = new Map(jornadas.map((row) => [row.fecha, row]));
+  const items: PeriodDayDetail[] = [];
+
+  for (const date of dates) {
+    if (context.fromDate && date < context.fromDate) continue;
+    if (context.untilDate && date > context.untilDate) continue;
+
+    const jornada = byDate.get(date);
+    if (feriados.has(date) || !isLaborableDate(date, dias, jornada)) continue;
+    if (date > context.today) continue;
+
+    const pendingToday =
+      date === context.today &&
+      !context.contarDiaEnCurso &&
+      !(jornada && isAsistida(jornada)) &&
+      isEntryWindowOpen(date, dias, context.nowMinutes, tolerancia);
+    if (pendingToday) continue;
+
+    const row: JornadaStatsRow = jornada ?? {
+      fecha: date,
+      estadoEntrada: 'SIN_MARCA',
+      estadoJornada: 'FALTA',
+      horasComputadas: 0,
+      horasJustificadas: 0,
+      horasPorJustificar: scheduledHoursForDate(date, dias, refrigerioMin),
+    };
+    if (['NO_LABORABLE', 'VACACIONES', 'LICENCIA'].includes(row.estadoJornada)) {
+      continue;
+    }
+
+    items.push({
+      fecha: date,
+      label: detalleLine(row),
+      horas: row.horasComputadas + row.horasJustificadas,
+    });
+  }
+
+  return items;
+}

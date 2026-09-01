@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildPeriodDetalle,
   computeLevel,
   computeNota,
   effectiveWindow,
@@ -352,6 +353,46 @@ describe('summarizePeriod', () => {
     );
     expect(summary.pctHoras).toBe(100);
     expect(summary.nota).toBe(20);
+  });
+});
+
+describe('buildPeriodDetalle', () => {
+  const dias = [
+    {
+      diaSemana: 1,
+      horaEntrada: '09:00:00',
+      horaSalida: '15:00:00',
+      esLaborable: true,
+    },
+    {
+      diaSemana: 2,
+      horaEntrada: '09:00:00',
+      horaSalida: '15:00:00',
+      esLaborable: true,
+    },
+  ];
+
+  it('incluye el día laborable sin jornada como falta', () => {
+    const detalle = buildPeriodDetalle(
+      ['2026-08-31', '2026-09-01', '2026-09-02'],
+      [
+        jornada('2026-08-31', {
+          estadoEntrada: 'TARDANZA',
+          horasComputadas: 6,
+        }),
+      ],
+      dias,
+      0,
+      {
+        today: '2026-09-01',
+        nowMinutes: 16 * 60,
+      },
+    );
+
+    expect(detalle.map((item) => item.label)).toEqual([
+      '31/08/2026  ⏰ Tardanza  ·  6 h',
+      '01/09/2026  ❌ Falta  ·  0 h',
+    ]);
   });
 });
 

@@ -48,6 +48,72 @@ function minutesOf(time: string): number {
   return parseTimeToMinutes(time);
 }
 
+function horasProgramadasDe(
+  horaProgramadaEntrada: string,
+  horaProgramadaSalida: string,
+  config: ToleranceConfig,
+): number {
+  const H = minutesOf(horaProgramadaEntrada);
+  const S = minutesOf(horaProgramadaSalida);
+  return roundHours((S - H - config.refrigerioMin) / 60);
+}
+
+function cerroConEntradaValida(estadoEntrada: EstadoEntrada): boolean {
+  return (
+    estadoEntrada === 'PUNTUAL' ||
+    estadoEntrada === 'PUNTUAL_ANTICIPADO' ||
+    estadoEntrada === 'TARDANZA'
+  );
+}
+
+function jornadaCerradaSinSalida(
+  estadoEntrada: EstadoEntrada,
+  horasProgramadas: number,
+  minutosTardanza: number,
+): JornadaCalculo {
+  const entro = cerroConEntradaValida(estadoEntrada);
+  return {
+    estadoEntrada,
+    estadoSalida: 'SIN_SALIDA',
+    estadoJornada: 'CERRADA',
+    horasComputadas: entro ? horasProgramadas : 0,
+    horasPorJustificar: entro ? 0 : horasProgramadas,
+    minutosTardanza,
+  };
+}
+
+/**
+ * Cierre automático: hubo entrada y no marcaron salida.
+ * Si llegó (puntual o tarde), las horas del turno cuentan y justificar
+ * el cierre es opcional. La tardanza sigue visible en puntualidad.
+ */
+export function cerrarJornadaSinSalida(
+  horaEntradaReal: string | null,
+  horaProgramadaEntrada: string | null,
+  horaProgramadaSalida: string | null,
+  config: ToleranceConfig = SPEC_TOLERANCES,
+): JornadaCalculo {
+  const abierta = calcularJornada(
+    horaEntradaReal,
+    null,
+    horaProgramadaEntrada,
+    horaProgramadaSalida,
+    config,
+  );
+  if (!horaProgramadaEntrada || !horaProgramadaSalida) {
+    return {
+      ...abierta,
+      estadoSalida: 'SIN_SALIDA',
+      estadoJornada: horaEntradaReal ? 'CERRADA' : abierta.estadoJornada,
+    };
+  }
+  return jornadaCerradaSinSalida(
+    abierta.estadoEntrada,
+    horasProgramadasDe(horaProgramadaEntrada, horaProgramadaSalida, config),
+    abierta.minutosTardanza,
+  );
+}
+
 /**
  * Motor de reglas ESPEC-ASIS-001 §§4–5.
  * H = hora de entrada programada, S = hora de salida programada.
@@ -102,7 +168,9 @@ export function calcularJornada(
   } else {
     estadoEntrada = 'TARDANZA';
     minutosTardanza = E - H;
-    inicioEfectivo = E;
+    // La tardanza solo afecta puntualidad. Justificarla es opcional:
+    // las horas se computan desde H, igual que un puntual.
+    inicioEfectivo = H;
   }
 
   if (!horaSalidaReal) {
@@ -134,14 +202,11 @@ export function calcularJornada(
   }
 
   if (estadoSalida === 'SIN_SALIDA') {
-    return {
+    return jornadaCerradaSinSalida(
       estadoEntrada,
-      estadoSalida,
-      estadoJornada: 'CERRADA',
-      horasComputadas: 0,
-      horasPorJustificar: horasProgramadas,
+      horasProgramadas,
       minutosTardanza,
-    };
+    );
   }
 
   const horasComputadas = roundHours(

@@ -16,7 +16,7 @@ import {
 } from '../utils/date';
 import { logger } from '../utils/logger';
 import { DashboardService } from './dashboardService';
-import { calcularJornada } from './jornadaRules';
+import { calcularJornada, cerrarJornadaSinSalida } from './jornadaRules';
 import { MysqlAttendanceStore } from './mysqlAttendanceStore';
 import { ScheduleBlock, ScheduleService } from './scheduleService';
 import { SheetsService } from './sheetsService';
@@ -335,9 +335,8 @@ export class AttendanceService {
       const tolerances = await this.store.getToleranceConfig(
         jornada.practicanteId,
       );
-      const calc = calcularJornada(
+      const calc = cerrarJornadaSinSalida(
         entryTime,
-        null,
         jornada.horaEntradaProgramada,
         jornada.horaSalidaProgramada,
         tolerances,
@@ -351,9 +350,9 @@ export class AttendanceService {
         entradaRealUtc: jornada.entradaReal,
         salidaRealUtc: null,
         estadoEntrada: calc.estadoEntrada,
-        estadoSalida: 'SIN_SALIDA',
-        estadoJornada: 'CERRADA',
-        horasComputadas: 0,
+        estadoSalida: calc.estadoSalida,
+        estadoJornada: calc.estadoJornada,
+        horasComputadas: calc.horasComputadas,
         horasPorJustificar: calc.horasPorJustificar,
         minutosTardanza: calc.minutosTardanza,
       });

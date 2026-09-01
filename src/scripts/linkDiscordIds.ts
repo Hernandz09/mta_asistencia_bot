@@ -19,6 +19,11 @@ const LINKS = [
     apellidos: 'Galarza',
     discordId: '637326275425599511',
   },
+  {
+    nombres: 'Deivyd',
+    apellidos: 'Saul',
+    discordId: '728636011797544990',
+  },
 ] as const;
 
 async function linkDiscordIds(): Promise<void> {

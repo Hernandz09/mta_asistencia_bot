@@ -12,11 +12,10 @@ import {
   HorarioDiaStats,
   JornadaStatsRow,
   PeriodSummary,
+  buildPeriodDetalle,
   computeLevel,
-  detalleEstadoLabel,
   effectiveWindow,
   formatDateEs,
-  formatHoursShort,
   monthLabelEs,
   sinceDaySuffix,
   summarizePeriod,
@@ -299,20 +298,15 @@ export class StatsService {
       }
     }
 
-    const detalle = jornadas
-      .filter((row) => {
-        if (!window) return false;
-        if (['NO_LABORABLE', 'VACACIONES', 'LICENCIA'].includes(row.estadoJornada)) {
-          return false;
-        }
-        return row.fecha >= window.start && row.fecha <= window.end;
-      })
-      .sort((a, b) => a.fecha.localeCompare(b.fecha))
-      .map((row) => ({
-        fecha: row.fecha,
-        label: this.detalleLine(row),
-        horas: row.horasComputadas + row.horasJustificadas,
-      }));
+    const detalle = window
+      ? buildPeriodDetalle(
+          summarizeDates,
+          jornadas,
+          horario.dias,
+          horario.refrigerioMin,
+          ctx,
+        )
+      : [];
 
     return {
       practicante,
@@ -342,11 +336,6 @@ export class StatsService {
       notaMes,
       detalle,
     };
-  }
-
-  private detalleLine(row: JornadaStatsRow): string {
-    const hours = row.horasComputadas + row.horasJustificadas;
-    return `${formatDateEs(row.fecha)}  ${detalleEstadoLabel(row)}  ·  ${formatHoursShort(hours)} h`;
   }
 
   private periodoLabel(
