@@ -20,7 +20,7 @@ import {
   BotStateService,
 } from '../services/botStateService';
 import { ConfigService } from '../services/configService';
-import { ErpReadService } from '../services/erpReadService';
+import { ErpPracticante, ErpReadService } from '../services/erpReadService';
 import {
   RankingResult,
   RankingService,
@@ -31,6 +31,8 @@ import { StatsResumen, StatsService } from '../services/statsService';
 import { logger } from '../utils/logger';
 
 const ESTADOS: BotEstadoNombre[] = ['ACTIVO', 'MANTENIMIENTO', 'DESACTIVADO'];
+const USERNAME_CACHE_MS = 5 * 60_000;
+const usernameCache = new Map<string, { name: string | null; expires: number }>();
 
 export interface BotApiServerOptions {
   port: number;
@@ -240,6 +242,38 @@ function rankingPayload(result: RankingResult) {
       cache_ttl_segundos: result.cacheTtlSeconds,
     },
   };
+}
+
+async function attachDiscordUsernames(
+  discordClient: Client,
+  list: ErpPracticante[],
+): Promise<ErpPracticante[]> {
+  if (!discordClient.isReady()) return list;
+  await Promise.all(
+    list.map(async (item) => {
+      if (!item.discordId) return;
+      const cached = usernameCache.get(item.discordId);
+      if (cached && cached.expires > Date.now()) {
+        item.discordUsername = cached.name;
+        return;
+      }
+      try {
+        const user = await discordClient.users.fetch(item.discordId);
+        item.discordUsername = user.username;
+        usernameCache.set(item.discordId, {
+          name: user.username,
+          expires: Date.now() + USERNAME_CACHE_MS,
+        });
+      } catch {
+        item.discordUsername = null;
+        usernameCache.set(item.discordId, {
+          name: null,
+          expires: Date.now() + 60_000,
+        });
+      }
+    }),
+  );
+  return list;
 }
 
 async function parseEstadoBody(
@@ -514,8 +548,11 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
               config: 'GET|PUT /api/v1/config',
               practicantes: 'GET /api/v1/practicantes',
               resumen: 'GET /api/v1/practicantes/{id}/resumen?periodo=mes',
+              horario: 'GET /api/v1/practicantes/{id}/horario',
               ranking: 'GET /api/v1/reportes/ranking',
               jornadas: 'GET /api/v1/jornadas?practicante_id&desde&hasta',
+              marcaciones: 'GET /api/v1/marcaciones?practicante_id&desde&hasta',
+              horarios: 'GET /api/v1/horarios?practicante_id=',
             },
           },
         });
@@ -555,7 +592,9 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
           estado: url.searchParams.get('estado') ?? undefined,
           area: url.searchParams.get('area') ?? undefined,
         });
-        sendJson(res, 200, { data: list });
+        sendJson(res, 200, {
+          data: await attachDiscordUsernames(client, list),
+        });
         return;
       }
 
@@ -576,6 +615,71 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
             total: result.total,
           },
         });
+        return;
+      }
+
+      if (method === 'GET' && path === '/api/v1/marcaciones') {
+        const tipo = url.searchParams.get('tipo');
+        if (tipo && tipo !== 'ENTRADA' && tipo !== 'SALIDA') {
+          sendJson(res, 400, {
+            error: { code: 400, message: 'tipo debe ser ENTRADA o SALIDA.' },
+          });
+          return;
+        }
+        const practicanteId = url.searchParams.get('practicante_id');
+        const result = await erpReadService.listMarcaciones({
+          practicanteId: practicanteId ? Number(practicanteId) : undefined,
+          desde: url.searchParams.get('desde') ?? undefined,
+          hasta: url.searchParams.get('hasta') ?? undefined,
+          tipo: tipo ?? undefined,
+          page: Number(url.searchParams.get('page') ?? 1),
+          perPage: Number(url.searchParams.get('per_page') ?? 50),
+        });
+        sendJson(res, 200, {
+          data: result.rows,
+          meta: {
+            page: result.page,
+            per_page: result.perPage,
+            total: result.total,
+          },
+        });
+        return;
+      }
+
+      if (method === 'GET' && path === '/api/v1/horarios') {
+        const practicanteId = url.searchParams.get('practicante_id');
+        if (!practicanteId) {
+          sendJson(res, 400, {
+            error: {
+              code: 400,
+              message: 'practicante_id es obligatorio.',
+            },
+          });
+          return;
+        }
+        const horario = await erpReadService.getHorario(Number(practicanteId));
+        if (!horario) {
+          sendJson(res, 404, {
+            error: { code: 404, message: 'Practicante no encontrado.' },
+          });
+          return;
+        }
+        sendJson(res, 200, { data: horario });
+        return;
+      }
+
+      const horarioMatch = path.match(
+        /^\/api\/v1\/practicantes\/(\d+)\/horario$/,
+      );
+      if (method === 'GET' && horarioMatch) {
+        const horario = await erpReadService.getHorario(Number(horarioMatch[1]));
+        if (!horario) {
+          sendJson(res, 404, {
+            error: { code: 404, message: 'Practicante no encontrado.' },
+          });
+          return;
+        }
+        sendJson(res, 200, { data: horario });
         return;
       }
 

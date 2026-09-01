@@ -23,6 +23,24 @@ export function getCurrentTime(
   }).format(referenceDate);
 }
 
+/** HH:MM:SS en zona de negocio. Null si no hay marca o el estado es vacío. */
+export function formatPunchClock(
+  utc: Date | null,
+  estado: string | null,
+  emptyEstados: readonly string[],
+  timezone: string,
+): string | null {
+  if (!utc || (estado && emptyEstados.includes(estado))) {
+    return null;
+  }
+  return getCurrentTime(timezone, utc);
+}
+
+/** ISO local America/Lima (UTC−5, sin DST). */
+export function formatLimaIso(utc: Date): string {
+  return `${getTodayDate('America/Lima', utc)}T${getCurrentTime('America/Lima', utc)}-05:00`;
+}
+
 export function parseTimeToMinutes(time: string): number {
   const [hours, minutes] = time.split(':').map(Number);
   return hours * 60 + minutes;

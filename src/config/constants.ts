@@ -145,7 +145,7 @@ export const TOP_BUTTON_TTL_MS = 5 * 60_000;
 export const TOP_RATE_LIMIT_MS = 30_000;
 
 export const HOURS_PER_LEVEL = 100;
-export const BOT_VERSION = '2.1.0';
+export const BOT_VERSION = '2.2.0';
 
 export const NOTE_WEIGHTS = {
   asistencia: 0.4,

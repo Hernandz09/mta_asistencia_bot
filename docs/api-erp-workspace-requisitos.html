@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Requisitos API ERP — Workspace MTA</title>
+  <style>
+    :root {
+      --bg: #f4f1ea;
+      --paper: #fffcf7;
+      --ink: #1c1915;
+      --muted: #5c564c;
+      --line: #e4ddd0;
+      --accent: #2f5d8a;
+      --accent-soft: #e8f0f7;
+      --gold: #b8860b;
+      --gold-bg: #fff6d8;
+      --green: #2d6a4f;
+      --green-bg: #d8f3dc;
+      --yellow: #9a6700;
+      --yellow-bg: #fff3cd;
+      --red: #9b2226;
+      --red-bg: #fde2e1;
+      --orange: #9a4a00;
+      --orange-bg: #ffe8cc;
+      --purple: #5a3d8a;
+      --purple-bg: #efe6f8;
+      --sidebar: #161310;
+      --sidebar-text: #d8d0c4;
+      --code: #0f1720;
+      --radius: 12px;
+      --shadow: 0 10px 30px rgba(28, 25, 21, 0.08);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; font-family: "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--ink); line-height: 1.6; }
+    .layout { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
+    nav { position: sticky; top: 0; height: 100vh; overflow-y: auto; background: var(--sidebar); color: var(--sidebar-text); padding: 24px 16px 40px; }
+    nav .brand { color: #c9a227; font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; }
+    nav h1 { color: #fff; font-size: 1.05rem; margin: 8px 0 6px; line-height: 1.3; }
+    nav .ver { font-size: 0.78rem; color: #8a8278; margin-bottom: 16px; }
+    nav .sec { font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: #8a8278; margin: 16px 8px 6px; }
+    nav a { display: block; color: var(--sidebar-text); text-decoration: none; padding: 6px 8px; border-radius: 8px; font-size: 0.86rem; }
+    nav a:hover { background: #2a2520; color: #fff; }
+    main { padding: 36px 48px 80px; max-width: 1100px; }
+    h2 { font-size: 1.55rem; margin: 0 0 8px; }
+    h3 { font-size: 1.1rem; margin: 24px 0 8px; }
+    p.lede { color: var(--muted); font-size: 1.03rem; }
+    .card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 22px; margin: 16px 0; box-shadow: var(--shadow); }
+    .badge { display: inline-block; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 999px; }
+    .p0 { background: var(--red-bg); color: var(--red); }
+    .p1 { background: var(--orange-bg); color: var(--orange); }
+    .p2 { background: var(--yellow-bg); color: var(--yellow); }
+    .ok { background: var(--green-bg); color: var(--green); }
+    .info { background: var(--accent-soft); color: var(--accent); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+    code, .mono { font-family: ui-monospace, Consolas, monospace; font-size: 0.86em; }
+    pre { background: var(--code); color: #e7eef5; padding: 14px 16px; border-radius: 10px; overflow-x: auto; font-size: 0.8rem; line-height: 1.5; }
+    .note { background: var(--accent-soft); border-left: 4px solid var(--accent); padding: 10px 14px; border-radius: 0 10px 10px 0; font-size: 0.92rem; }
+    .callout { background: var(--gold-bg); border-left: 4px solid var(--gold); padding: 10px 14px; border-radius: 0 10px 10px 0; font-size: 0.92rem; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    ul.compact li { margin: 4px 0; }
+    footer { color: var(--muted); font-size: 0.85rem; margin-top: 48px; }
+    .diff-add { color: #86efac; }
+    .diff-del { color: #fca5a5; text-decoration: line-through; opacity: 0.75; }
+    @media (max-width: 960px) {
+      .layout { grid-template-columns: 1fr; }
+      nav { position: relative; height: auto; }
+      main { padding: 24px 16px 60px; }
+      .grid2 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+<nav>
+  <div class="brand">MTA Software</div>
+  <h1>Requisitos API para Workspace</h1>
+  <div class="ver">Complemento a <a href="api-erp.html" style="color:#c9a227">api-erp.html</a> · sep 2026</div>
+
+  <div class="sec">Contexto</div>
+  <a href="#resumen">Resumen ejecutivo</a>
+  <a href="#consumidor">Quién consume</a>
+  <a href="#matriz">Matriz hoy / falta</a>
+
+  <div class="sec">Prioridad alta</div>
+  <a href="#jornadas-horas">Horas en /jornadas</a>
+  <a href="#convenciones">Convenciones de campos</a>
+
+  <div class="sec">Prioridad media</div>
+  <a href="#practicantes">Practicantes</a>
+  <a href="#horarios">Horarios</a>
+  <a href="#marcaciones">GET /marcaciones</a>
+
+  <div class="sec">Ya integrado</div>
+  <a href="#resumen-mes">Resumen y notas</a>
+  <a href="#ranking">Ranking</a>
+
+  <div class="sec">Cierre</div>
+  <a href="#versionado">Versionado</a>
+  <a href="#checklist">Checklist bot</a>
+</nav>
+
+<main>
+  <p class="badge info">Especificación para el equipo del bot</p>
+  <h2 id="resumen">Requisitos para completar la integración Workspace ↔ Bot</h2>
+  <p class="lede">
+    El <strong>Workspace MTA</strong> (<code>workspace-mta.site</code>) ya consume la API ERP v2.1
+    con <code>ATTENDANCE_BOT_API_KEY</code>. La conexión funciona: practicantes, jornadas, resumen mensual
+    y ranking llegan bien. Este documento lista qué debe <strong>ampliarse o publicarse</strong> en el bot
+    para reemplazar por completo el legado de Google Sheets y mostrar la misma riqueza en pantalla.
+  </p>
+
+  <div class="card">
+    <h3 style="margin-top:0">Resumen ejecutivo</h3>
+    <table>
+      <tr><th>Prioridad</th><th>Qué falta</th><th>Impacto en Workspace</th></tr>
+      <tr>
+        <td><span class="badge p0">P0</span></td>
+        <td><code>horaEntrada</code> y <code>horaSalida</code> en <code>GET /jornadas</code></td>
+        <td>Columnas Entrada/Salida en módulo Asistencias (hoy muestran <code>—</code>)</td>
+      </tr>
+      <tr>
+        <td><span class="badge p1">P1</span></td>
+        <td><code>GET /horarios</code> por practicante</td>
+        <td>Tarjeta «Tu horario» deja de depender de Sheets</td>
+      </tr>
+      <tr>
+        <td><span class="badge p1">P1</span></td>
+        <td><code>discordUsername</code> en practicantes</td>
+        <td>Filtro admin y tabla alineados al nick de Discord</td>
+      </tr>
+      <tr>
+        <td><span class="badge p2">P2</span></td>
+        <td><code>GET /marcaciones</code> (listado)</td>
+        <td>Auditoría / detalle crudo sin ampliar jornadas</td>
+      </tr>
+    </table>
+  </div>
+
+  <h2 id="consumidor">1. Consumidor (Workspace)</h2>
+  <div class="card">
+    <ul class="compact">
+      <li><strong>Cliente HTTP:</strong> <code>Workspace/server/src/lib/attendance-bot-api.js</code></li>
+      <li><strong>Mapeo UI:</strong> <code>Workspace/server/src/lib/attendance-erp-mappers.js</code></li>
+      <li><strong>Módulos:</strong> Asistencias (tabla + analítica), Notas (nota asistencia 20 %)</li>
+      <li><strong>Auth:</strong> cabecera <code>x-api-key</code> (misma que <code>BOT_API_KEY</code> en Railway)</li>
+      <li><strong>Zona horaria:</strong> <code>America/Lima</code> — fechas de jornada en calendario local</li>
+      <li><strong>Periodo de prácticas:</strong> 2026-08-17 → 2026-12-10 (filtro <code>desde</code>/<code>hasta</code> en jornadas)</li>
+    </ul>
+    <p class="note" style="margin-top:12px">
+      El Workspace <strong>no escribe</strong> marcaciones. Solo lectura. Cualquier alta/justificación sigue en Discord o MySQL del bot.
+    </p>
+  </div>
+
+  <h2 id="matriz">2. Matriz: qué funciona hoy</h2>
+  <div class="card">
+    <table>
+      <tr><th>Endpoint / dato</th><th>Estado</th><th>Uso en Workspace</th></tr>
+      <tr>
+        <td><code>GET /api/v1/practicantes</code></td>
+        <td><span class="badge ok">OK</span></td>
+        <td>Catálogo, lookup por <code>discordId</code>, nombre en tabla</td>
+      </tr>
+      <tr>
+        <td><code>GET /api/v1/jornadas</code></td>
+        <td><span class="badge p0">Parcial</span></td>
+        <td>Tabla asistencias — faltan horas de marcación</td>
+      </tr>
+      <tr>
+        <td><code>GET /api/v1/practicantes/{id}/resumen</code></td>
+        <td><span class="badge ok">OK</span></td>
+        <td>Nota mes, % asistencia, hero practicante, sync Notas</td>
+      </tr>
+      <tr>
+        <td><code>GET /api/v1/reportes/ranking</code></td>
+        <td><span class="badge ok">OK</span></td>
+        <td>Chip ranking en vista practicante (admin opcional)</td>
+      </tr>
+      <tr>
+        <td><code>GET /api/v1/marcaciones</code></td>
+        <td><span class="badge p2">404</span></td>
+        <td>Previsto en spec; no implementado</td>
+      </tr>
+      <tr>
+        <td><code>GET /api/v1/horarios</code></td>
+        <td><span class="badge p1">404</span></td>
+        <td>Hoy: horario por defecto 09:00–15:00 o Sheets legacy</td>
+      </tr>
+      <tr>
+        <td>Google Sheets Asistencias</td>
+        <td><span class="badge info">Obsoleto</span></td>
+        <td>Retirado del Workspace — no usar como respaldo en producción</td>
+      </tr>
+    </table>
+  </div>
+
+  <h2 id="jornadas-horas">3. P0 — Horas en <code>GET /jornadas</code></h2>
+  <div class="card">
+    <p>
+      <strong>Problema actual:</strong> la respuesta solo incluye estados y horas computadas.
+      El Workspace ya mapea estos alias si el bot los envía (sin cambio de código adicional):
+    </p>
+    <table>
+      <tr><th>Campo preferido (camelCase)</th><th>Alternativas aceptadas</th><th>Formato</th></tr>
+      <tr><td><code>horaEntrada</code></td><td><code>hora_entrada</code>, <code>entradaAt</code>, <code>entrada_at</code>, <code>fechaHoraEntrada</code>, <code>marcacionEntrada</code></td><td><code>HH:MM:SS</code> o ISO <code>2026-09-01T09:00:02-05:00</code></td></tr>
+      <tr><td><code>horaSalida</code></td><td><code>hora_salida</code>, <code>salidaAt</code>, <code>salida_at</code>, <code>fechaHoraSalida</code>, <code>marcacionSalida</code></td><td>Igual que entrada</td></tr>
+    </table>
+
+    <h3>Respuesta actual (v2.1)</h3>
+<pre>{
+  "id": 190,
+  "practicanteId": 14,
+  "fecha": "2026-09-01",
+  "estadoEntrada": "FUERA_DE_HORARIO",
+  "estadoSalida": "SIN_SALIDA",
+  "estadoJornada": "ABIERTA",
+  "horasComputadas": 0,
+  "horasJustificadas": 0,
+  "horasPorJustificar": 0
+}</pre>
+
+    <h3>Respuesta objetivo (mínimo para Workspace)</h3>
+<pre>{
+  "id": 190,
+  "practicanteId": 14,
+  "fecha": "2026-09-01",
+  <span class="diff-add">"horaEntrada": "09:00:07",</span>
+  <span class="diff-add">"horaSalida": null,</span>
+  "estadoEntrada": "FUERA_DE_HORARIO",
+  "estadoSalida": "SIN_SALIDA",
+  "estadoJornada": "ABIERTA",
+  "horasComputadas": 0,
+  "horasJustificadas": 0,
+  "horasPorJustificar": 0
+}</pre>
+
+    <h3>Jornada cerrada (ejemplo)</h3>
+<pre>{
+  "id": 180,
+  "practicanteId": 10,
+  "fecha": "2026-08-31",
+  <span class="diff-add">"horaEntrada": "08:57:26",</span>
+  <span class="diff-add">"horaSalida": "15:02:10",</span>
+  "estadoEntrada": "PUNTUAL_ANTICIPADO",
+  "estadoSalida": "PUNTUAL",
+  "estadoJornada": "CERRADA",
+  "horasComputadas": 6,
+  "horasJustificadas": 0,
+  "horasPorJustificar": 0
+}</pre>
+
+    <p class="callout">
+      <strong>Reglas de negocio sugeridas:</strong>
+      <code>horaEntrada</code> = null si <code>estadoEntrada</code> es <code>SIN_MARCA</code>.
+      <code>horaSalida</code> = null si <code>estadoSalida</code> es <code>SIN_SALIDA</code>.
+      Horas en <strong>America/Lima</strong> (no UTC en el string si se usa <code>HH:MM:SS</code>).
+    </p>
+  </div>
+
+  <h2 id="convenciones">4. Convenciones de campos</h2>
+  <div class="card grid2">
+    <div>
+      <h3 style="margin-top:0">Nombres</h3>
+      <ul class="compact">
+        <li><code>/jornadas</code> y <code>/practicantes</code>: mantener <strong>camelCase</strong> (como hoy).</li>
+        <li><code>/resumen</code>: puede seguir <strong>snake_case</strong> — el Workspace lee ambos.</li>
+        <li>No romper campos existentes; solo <strong>añadir</strong> los nuevos.</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="margin-top:0">Enums ya mapeados en UI</h3>
+      <p><strong>Entrada:</strong> <code>PUNTUAL</code>, <code>PUNTUAL_ANTICIPADO</code>, <code>TARDANZA</code>, <code>FUERA_DE_HORARIO</code>, <code>SIN_MARCA</code></p>
+      <p><strong>Salida:</strong> <code>PUNTUAL</code>, <code>SALIDA_ANTICIPADA</code>, <code>FUERA_DE_HORA_SALIDA</code>, <code>SIN_SALIDA</code></p>
+      <p><strong>Jornada:</strong> <code>ABIERTA</code>, <code>CERRADA</code>, <code>FALTA</code>, <code>LICENCIA</code>, etc.</p>
+    </div>
+  </div>
+
+  <h2 id="practicantes">5. P1 — Practicantes</h2>
+  <div class="card">
+    <p>Campos opcionales recomendados en <code>GET /practicantes</code>:</p>
+    <table>
+      <tr><th>Campo</th><th>Tipo</th><th>Para qué</th></tr>
+      <tr><td><code>discordUsername</code></td><td>string</td><td>Nick de Discord (<code>zkingwolfx</code>) — filtro admin y columna Usuario</td></tr>
+      <tr><td><code>discordId</code></td><td>string</td><td>Ya existe — vincular cuenta Workspace ↔ practicante</td></tr>
+      <tr><td><code>nombre</code></td><td>string</td><td>Ya existe — nombre para mostrar</td></tr>
+    </table>
+<pre>{
+  "id": 14,
+  "discordId": "746486166684958872",
+  <span class="diff-add">"discordUsername": "zkingwolfx",</span>
+  "nombres": "zkingwolfx",
+  "apellidos": "",
+  "nombre": "zkingwolfx",
+  "area": "software",
+  "estado": "activo"
+}</pre>
+  </div>
+
+  <h2 id="horarios">6. P1 — Horarios por practicante</h2>
+  <div class="card">
+    <p>
+      Endpoint sugerido (hoy <code>404</code> según <a href="api-erp.html#fuera">api-erp.html §9</a>).
+      El Workspace necesita bloques semanales para la tarjeta de horario y meta de horas.
+    </p>
+    <p><strong>Propuesta:</strong> <code>GET /api/v1/practicantes/{id}/horario</code> o <code>GET /api/v1/horarios?practicante_id=</code></p>
+<pre>{
+  "data": {
+    "practicanteId": 14,
+    "displayName": "zkingwolfx",
+    "weeklyScheduledHours": 30,
+    "blocks": [
+      { "day": 1, "dayLabel": "Lunes", "start": "09:00", "end": "15:00", "hours": 6 },
+      { "day": 2, "dayLabel": "Martes", "start": "09:00", "end": "15:00", "hours": 6 }
+    ]
+  }
+}</pre>
+    <p><code>day</code>: 1 = Lunes … 5 = Viernes (igual que el bot en Discord). Si no hay horario personalizado, devolver el horario de área o el default del sistema.</p>
+  </div>
+
+  <h2 id="marcaciones">7. P2 — Listado de marcaciones (alternativa)</h2>
+  <div class="card">
+    <p>
+      Si preferís no duplicar horas en <code>/jornadas</code>, podéis exponer
+      <code>GET /api/v1/marcaciones</code> con paginación. El Workspace podría hacer join por
+      <code>practicante_id</code> + <code>fecha</code> + <code>tipo</code> (ENTRADA/SALIDA).
+    </p>
+    <table>
+      <tr><th>Query</th><th>Descripción</th></tr>
+      <tr><td><code>practicante_id</code></td><td>Filtro opcional</td></tr>
+      <tr><td><code>desde</code> / <code>hasta</code></td><td>YYYY-MM-DD</td></tr>
+      <tr><td><code>tipo</code></td><td><code>ENTRADA | SALIDA</code></td></tr>
+      <tr><td><code>page</code> / <code>per_page</code></td><td>Igual que jornadas (máx. 100)</td></tr>
+    </table>
+<pre>{
+  "data": [{
+    "id": 9001,
+    "practicanteId": 14,
+    "jornadaId": 190,
+    "fecha": "2026-09-01",
+    "tipo": "ENTRADA",
+    "registradoEn": "2026-09-01T09:00:07-05:00",
+    "horaLocal": "09:00:07",
+    "origen": "DISCORD"
+  }],
+  "meta": { "page": 1, "per_page": 50, "total": 1 }
+}</pre>
+    <p class="note">Opción B. La opción A (campos en jornada) es más simple y evita N+1 en el Workspace.</p>
+  </div>
+
+  <h2 id="resumen-mes">8. Ya integrado — Resumen mensual (Notas)</h2>
+  <div class="card">
+    <p>El Workspace lee <code>GET /practicantes/{id}/resumen?periodo=mes</code> para:</p>
+    <ul class="compact">
+      <li><code>indicadores.nota</code> → nota de asistencia del mes (peso 20 % en nota final)</li>
+      <li><code>indicadores.pct_asistencia</code> → % en ficha de asistencia</li>
+      <li><code>indicadores.pct_puntualidad</code>, <code>pct_horas</code> → analítica hero</li>
+      <li><code>horas.acumuladas</code>, <code>horas.semana</code>, <code>horas.meta_semana</code> → gráficos semanales</li>
+      <li><code>ranking.posicion</code> / <code>ranking.total</code> → chip ranking</li>
+    </ul>
+    <p><strong>No requiere cambios</strong> salvo que queráis exponer <code>nota_mes</code> histórica por mes cerrado (hoy el sync de meses pasados usa jornadas acumuladas).</p>
+  </div>
+
+  <h2 id="ranking">9. Ya integrado — Ranking</h2>
+  <div class="card">
+    <p><code>GET /reportes/ranking?periodo=mes&amp;criterio=asistencia&amp;limite=20</code> — usado en vista admin (opcional) y contexto de equipo. Sin cambios requeridos.</p>
+  </div>
+
+  <h2 id="versionado">10. Versionado y despliegue</h2>
+  <div class="card">
+    <ul class="compact">
+      <li>Ampliar <code>/jornadas</code> es <strong>compatible hacia atrás</strong> (campos nuevos opcionales).</li>
+      <li>Recomendado: subir <code>version</code> en <code>GET /api/v1</code> a <code>2.2.0</code> al publicar horas.</li>
+      <li>El Workspace no necesita redeploy obligatorio si solo añadís campos — el mapper ya los consume.</li>
+      <li>Probar con: <code>curl -H "x-api-key: $KEY" "$BASE/api/v1/jornadas?desde=2026-09-01&amp;hasta=2026-09-01&amp;per_page=3"</code></li>
+    </ul>
+  </div>
+
+  <h2 id="checklist">11. Checklist para el equipo del bot</h2>
+  <div class="card">
+    <table>
+      <tr><th></th><th>Tarea</th><th>Criterio de aceptación</th></tr>
+      <tr>
+        <td>☐</td>
+        <td>Añadir <code>horaEntrada</code> / <code>horaSalida</code> en jornadas</td>
+        <td>Workspace muestra horas en tabla Asistencias sin <code>—</code> en filas con marca</td>
+      </tr>
+      <tr>
+        <td>☐</td>
+        <td>Null coherente con <code>SIN_MARCA</code> / <code>SIN_SALIDA</code></td>
+        <td>Jornada abierta: entrada con hora, salida null</td>
+      </tr>
+      <tr>
+        <td>☐</td>
+        <td>(Opcional) <code>discordUsername</code> en practicantes</td>
+        <td>Filtro por nick funciona en vista admin</td>
+      </tr>
+      <tr>
+        <td>☐</td>
+        <td>(Opcional) <code>GET …/horario</code></td>
+        <td>Tarjeta horario muestra bloques reales del bot</td>
+      </tr>
+      <tr>
+        <td>☐</td>
+        <td>Actualizar <code>api-erp.html</code> con el nuevo schema</td>
+        <td>Doc operativa alineada con producción</td>
+      </tr>
+    </table>
+  </div>
+
+  <footer>
+    MTA SOFTWARE — Workspace MTA · Generado para complementar
+    <a href="api-erp.html">api-erp.html</a> ·
+    Código consumidor: <code>Workspace/server/src/lib/attendance-bot-api.js</code>
+  </footer>
+</main>
+</div>
+</body>
+</html>

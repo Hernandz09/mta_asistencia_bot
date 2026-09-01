@@ -35,7 +35,7 @@ async function main(): Promise<void> {
     sheetsService,
   );
   const configService = new ConfigService(pool);
-  const erpReadService = new ErpReadService(pool);
+  const erpReadService = new ErpReadService(pool, config.timezone);
   const rankingService = new RankingService(pool, config.timezone, configService);
   const statsService = new StatsService(
     pool,

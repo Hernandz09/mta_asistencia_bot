@@ -5,6 +5,8 @@ import {
   eachDateInclusive,
   formatDurationHours,
   formatDurationHoursWords,
+  formatLimaIso,
+  formatPunchClock,
   getCalendarMonthRange,
   getCurrentWeekRange,
   getMonthRange,
@@ -140,5 +142,40 @@ describe('eachDateInclusive', () => {
       '2026-08-30',
       '2026-08-31',
     ]);
+  });
+});
+
+describe('formatPunchClock', () => {
+  it('convierte UTC a HH:MM:SS en America/Lima', () => {
+    expect(
+      formatPunchClock(
+        new Date('2026-09-01T14:00:07.000Z'),
+        'PUNTUAL',
+        ['SIN_MARCA'],
+        'America/Lima',
+      ),
+    ).toBe('09:00:07');
+  });
+
+  it('devuelve null si el estado es SIN_SALIDA o no hay marca', () => {
+    expect(
+      formatPunchClock(
+        new Date('2026-09-01T20:00:00.000Z'),
+        'SIN_SALIDA',
+        ['SIN_SALIDA'],
+        'America/Lima',
+      ),
+    ).toBeNull();
+    expect(
+      formatPunchClock(null, 'PUNTUAL', ['SIN_MARCA'], 'America/Lima'),
+    ).toBeNull();
+  });
+});
+
+describe('formatLimaIso', () => {
+  it('incluye offset fijo UTC−5', () => {
+    expect(formatLimaIso(new Date('2026-09-01T14:00:07.000Z'))).toBe(
+      '2026-09-01T09:00:07-05:00',
+    );
   });
 });

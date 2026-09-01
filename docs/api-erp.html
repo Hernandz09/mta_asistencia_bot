@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>API ERP — Bot de Asistencias MTA</title>
+  <style>
+    :root {
+      --bg: #f4f1ea;
+      --paper: #fffcf7;
+      --ink: #1c1915;
+      --muted: #5c564c;
+      --line: #e4ddd0;
+      --accent: #2f5d8a;
+      --accent-soft: #e8f0f7;
+      --gold: #b8860b;
+      --gold-bg: #fff6d8;
+      --green: #2d6a4f;
+      --green-bg: #d8f3dc;
+      --yellow: #9a6700;
+      --yellow-bg: #fff3cd;
+      --red: #9b2226;
+      --red-bg: #fde2e1;
+      --orange: #9a4a00;
+      --orange-bg: #ffe8cc;
+      --purple: #5a3d8a;
+      --purple-bg: #efe6f8;
+      --gray: #495057;
+      --gray-bg: #e9ecef;
+      --sidebar: #161310;
+      --sidebar-text: #d8d0c4;
+      --code: #0f1720;
+      --radius: 12px;
+      --shadow: 0 10px 30px rgba(28, 25, 21, 0.08);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.6;
+    }
+    .layout { display: grid; grid-template-columns: 300px 1fr; min-height: 100vh; }
+    nav {
+      position: sticky; top: 0; height: 100vh; overflow-y: auto;
+      background: var(--sidebar); color: var(--sidebar-text); padding: 24px 16px 40px;
+    }
+    nav .brand { color: #c9a227; font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; }
+    nav h1 { color: #fff; font-size: 1.12rem; margin: 8px 0 6px; line-height: 1.3; }
+    nav .ver { font-size: 0.78rem; color: #8a8278; margin-bottom: 16px; }
+    nav input {
+      width: 100%; border: 0; border-radius: 8px; padding: 9px 10px;
+      background: #2a2520; color: #fff; margin-bottom: 16px; font: inherit;
+    }
+    nav .sec { font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: #8a8278; margin: 16px 8px 6px; }
+    nav a { display: flex; align-items: center; gap: 8px; color: var(--sidebar-text); text-decoration: none; padding: 6px 8px; border-radius: 8px; font-size: 0.86rem; }
+    nav a:hover, nav a.active { background: #2a2520; color: #fff; }
+    nav .m { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.04em; padding: 2px 5px; border-radius: 4px; color: #fff; min-width: 42px; text-align: center; }
+    .m-get { background: #2d6a4f; }
+    .m-put { background: #9a6700; }
+    .m-post { background: #2f5d8a; }
+    .m-patch { background: #5a3d8a; }
+    .m-del { background: #9b2226; }
+    main { padding: 36px 48px 80px; max-width: 1100px; }
+    h2 { font-size: 1.6rem; margin: 0 0 8px; }
+    h3 { font-size: 1.15rem; margin: 28px 0 8px; }
+    p.lede { color: var(--muted); font-size: 1.05rem; }
+    .card {
+      background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 22px 24px; margin: 16px 0; box-shadow: var(--shadow);
+    }
+    .endpoint {
+      background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius);
+      margin: 18px 0 28px; overflow: hidden; box-shadow: var(--shadow);
+    }
+    .endpoint .head {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+      padding: 14px 18px; border-bottom: 1px solid var(--line); background: #faf7f1;
+    }
+    .endpoint .path { font-family: ui-monospace, Consolas, monospace; font-size: 0.95rem; word-break: break-all; }
+    .endpoint .body { padding: 16px 18px 20px; }
+    .badge { display: inline-block; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 999px; }
+    .ok { background: var(--green-bg); color: var(--green); }
+    .warn { background: var(--yellow-bg); color: var(--yellow); }
+    .no { background: var(--red-bg); color: var(--red); }
+    .info { background: var(--accent-soft); color: var(--accent); }
+    .auth { background: var(--gold-bg); color: var(--gold); }
+    .pub { background: var(--green-bg); color: var(--green); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+    code, .mono { font-family: ui-monospace, Consolas, monospace; font-size: 0.86em; }
+    pre {
+      background: var(--code); color: #e7eef5; padding: 14px 16px; border-radius: 10px;
+      overflow-x: auto; font-size: 0.82rem; line-height: 1.5; position: relative;
+    }
+    pre .copy {
+      position: absolute; top: 8px; right: 8px; background: #334155; color: #fff; border: 0;
+      border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: 0.72rem;
+    }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .note { background: var(--accent-soft); border-left: 4px solid var(--accent); padding: 10px 14px; border-radius: 0 10px 10px 0; font-size: 0.92rem; }
+    .callout { background: var(--gold-bg); border-left: 4px solid var(--gold); padding: 10px 14px; border-radius: 0 10px 10px 0; }
+    ul.compact li { margin: 4px 0; }
+    footer { color: var(--muted); font-size: 0.85rem; margin-top: 48px; }
+    @media (max-width: 960px) {
+      .layout { grid-template-columns: 1fr; }
+      nav { position: relative; height: auto; }
+      main { padding: 24px 16px 60px; }
+      .grid2 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+<nav>
+  <div class="brand">MTA Software</div>
+  <h1>API del Bot para el ERP</h1>
+  <div class="ver">v2.2 · ESPEC-ASIS-001 a 004</div>
+  <input id="q" type="search" placeholder="Filtrar endpoints…" />
+
+  <div class="sec">Inicio</div>
+  <a href="#modelo">Modelo de integración</a>
+  <a href="#auth">Autenticación</a>
+  <a href="#errores">Errores</a>
+  <a href="#crud">Mapa CRUD</a>
+  <a href="#enums">Enumeraciones</a>
+
+  <div class="sec">Catálogo</div>
+  <a href="#e-root"><span class="m m-get">GET</span> /</a>
+  <a href="#e-catalog"><span class="m m-get">GET</span> /api/v1</a>
+  <a href="#e-health"><span class="m m-get">GET</span> /health</a>
+  <a href="#e-estado-get"><span class="m m-get">GET</span> /bot/estado</a>
+  <a href="#e-estado-put"><span class="m m-put">PUT</span> /bot/estado</a>
+  <a href="#e-activar"><span class="m m-post">POST</span> /estado/activar</a>
+  <a href="#e-mant"><span class="m m-post">POST</span> /mantenimiento</a>
+  <a href="#e-desact"><span class="m m-post">POST</span> /desactivar</a>
+  <a href="#e-hist"><span class="m m-get">GET</span> /historial</a>
+  <a href="#e-hist-id"><span class="m m-get">GET</span> /historial/{id}</a>
+  <a href="#e-config-get"><span class="m m-get">GET</span> /config</a>
+  <a href="#e-config-put"><span class="m m-put">PUT</span> /config</a>
+  <a href="#e-prac"><span class="m m-get">GET</span> /practicantes</a>
+  <a href="#e-resumen"><span class="m m-get">GET</span> /resumen</a>
+  <a href="#e-horario"><span class="m m-get">GET</span> /horario</a>
+  <a href="#e-jornadas"><span class="m m-get">GET</span> /jornadas</a>
+  <a href="#e-marcaciones"><span class="m m-get">GET</span> /marcaciones</a>
+  <a href="#e-ranking"><span class="m m-get">GET</span> /ranking</a>
+  <a href="#e-snap-list"><span class="m m-get">GET</span> /snapshots</a>
+  <a href="#e-snap-id"><span class="m m-get">GET</span> /snapshots/{id}</a>
+  <a href="#e-snap-post"><span class="m m-post">POST</span> /snapshots</a>
+  <a href="#e-snap-patch"><span class="m m-patch">PATCH</span> /snapshots/{id}</a>
+  <a href="#e-snap-del"><span class="m m-del">DEL</span> /snapshots/{id}</a>
+
+  <div class="sec">Anexo</div>
+  <a href="#config-keys">Claves de configuración</a>
+  <a href="#ejemplos">Cliente de ejemplo</a>
+  <a href="#fuera">Fuera de alcance (hoy)</a>
+</nav>
+
+<main>
+  <p class="badge info">Documento operativo</p>
+  <h2>Referencia HTTP para conectar el ERP</h2>
+  <p class="lede">
+    El bot de asistencias es el sistema de registro (Discord + MySQL). El ERP es un
+    <strong>cliente HTTP</strong>: lee datos y cambia configuración / estado. El bot
+    <strong>no llama al ERP</strong> para marcar entrada o salida.
+  </p>
+
+  <div class="card">
+    <table>
+      <tr><th>Base URL</th><td><code>https://mtaasistenciabot-production.up.railway.app</code></td></tr>
+      <tr><th>Prefijo</th><td><code>/api/v1</code></td></tr>
+      <tr><th>Formato</th><td>JSON UTF-8 · <code>Content-Type: application/json</code></td></tr>
+      <tr><th>CORS</th><td>Abierto (<code>Access-Control-Allow-Origin: *</code>). Preflight <code>OPTIONS</code> → 204.</td></tr>
+      <tr><th>Zona horaria de negocio</th><td><code>America/Lima</code> (fechas de jornada en calendario local)</td></tr>
+      <tr><th>Versión del bot</th><td><code>2.2.0</code> (campo <code>version</code> en health / estado)</td></tr>
+    </table>
+  </div>
+
+  <h2 id="modelo">1. Modelo de integración</h2>
+  <div class="card">
+    <ul class="compact">
+      <li><strong>Fuente de verdad:</strong> MySQL del bot (Hostinger). Sheets es respaldo de emergencia, no API.</li>
+      <li><strong>Quién escribe asistencias:</strong> Discord (botones Entrada / Salida). El ERP no registra marcaciones por esta API.</li>
+      <li><strong>Quién lee:</strong> el ERP consume practicantes, jornadas (con horas de marca), horarios, marcaciones, resumen, ranking y config.</li>
+      <li><strong>Quién opera el bot:</strong> el ERP puede poner el bot en mantenimiento / desactivado y editar variables de <code>config_sistema</code>.</li>
+    </ul>
+    <p class="note" style="margin-top:12px">
+      Convención de nombres: la mayoría de payloads usan <code>snake_case</code>.
+      <code>GET /practicantes</code> y <code>GET /jornadas</code> hoy devuelven
+      <code>camelCase</code> (campos tal cual salen del servicio). El ERP debe mapear ambos.
+    </p>
+  </div>
+
+  <h2 id="auth">2. Autenticación</h2>
+  <div class="card">
+    <p>Todos los endpoints salvo <strong>health</strong> y la raíz <code>/</code> exigen API key.</p>
+    <p>Enviar <strong>una</strong> de estas cabeceras (el valor es <code>BOT_API_KEY</code> de Railway):</p>
+<pre><button class="copy" type="button">Copiar</button>x-api-key: TU_BOT_API_KEY
+
+Authorization: Bearer TU_BOT_API_KEY</pre>
+    <table>
+      <tr><th>401</th><td>Key ausente, distinta o de longitud distinta (comparación timing-safe).</td></tr>
+      <tr><th>503</th><td>El bot arrancó sin <code>BOT_API_KEY</code>.</td></tr>
+    </table>
+    <p class="callout" style="margin-top:12px">No hay JWT, OAuth ni scopes. Quien tenga la key tiene acceso de lectura y a los PUT/POST/PATCH/DELETE documentados.</p>
+  </div>
+
+  <h2 id="errores">3. Errores</h2>
+  <div class="card">
+    <p>Cuerpo unificado:</p>
+<pre><button class="copy" type="button">Copiar</button>{
+  "error": { "code": 401, "message": "API Key ausente o inválida." }
+}</pre>
+    <table>
+      <tr><th>400</th><td>Parámetro o JSON inválido.</td></tr>
+      <tr><th>401</th><td>Sin credencial válida.</td></tr>
+      <tr><th>404</th><td>Ruta, practicante, área o snapshot inexistente.</td></tr>
+      <tr><th>409</th><td>El bot ya está en ese estado con el mismo mensaje.</td></tr>
+      <tr><th>422</th><td>Regla de negocio (fecha pasada, config inválida).</td></tr>
+      <tr><th>500</th><td>Error interno.</td></tr>
+      <tr><th>503</th><td>Health degradado, o API key no configurada en el proceso.</td></tr>
+    </table>
+  </div>
+
+  <h2 id="crud">4. Mapa CRUD (lo que existe hoy)</h2>
+  <div class="card">
+    <table>
+      <thead>
+        <tr><th>Recurso</th><th>Listar</th><th>Leer uno</th><th>Crear</th><th>Actualizar</th><th>Borrar</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Estado del bot</td>
+          <td><span class="badge ok">GET</span></td>
+          <td><span class="badge ok">GET</span></td>
+          <td><span class="badge info">POST atajos</span></td>
+          <td><span class="badge warn">PUT</span></td>
+          <td><span class="badge no">No</span></td>
+        </tr>
+        <tr>
+          <td>Historial de estado</td>
+          <td><span class="badge ok">GET</span></td>
+          <td><span class="badge ok">GET {id}</span></td>
+          <td><span class="badge no">No</span></td>
+          <td><span class="badge no">No</span></td>
+          <td><span class="badge no">No</span></td>
+        </tr>
+        <tr>
+          <td>Configuración</td>
+          <td><span class="badge ok">GET</span></td>
+          <td>—</td>
+          <td>—</td>
+          <td><span class="badge warn">PUT (upsert claves)</span></td>
+          <td><span class="badge no">No</span></td>
+        </tr>
+        <tr>
+          <td>Practicantes</td>
+          <td><span class="badge ok">GET</span></td>
+          <td><span class="badge no">No</span></td>
+          <td><span class="badge no">No</span></td>
+          <td><span class="badge no">No</span></td>
+          <td><span class="badge no">No</span></td>
+        </tr>
+        <tr>
+          <td>Resumen / nota</td>
+          <td>—</td>
+          <td><span class="badge ok">GET</span></td>
+          <td>—</td>
+          <td>—</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td>Jornadas</td>
+          <td><span class="badge ok">GET</span></td>
+          <td><span class="badge no">No</span></td>
+          <td><span class="badge no">No</span></td>
+          <td><span class="badge no">No</span></td>
+          <td><span class="badge no">No</span></td>
+        </tr>
+        <tr>
+          <td>Horarios</td>
+          <td><span class="badge ok">GET</span></td>
+          <td><span class="badge ok">GET {id}/horario</span></td>
+          <td><span class="badge no">No</span></td>
+          <td><span class="badge no">No</span></td>
+          <td><span class="badge no">No</span></td>
+        </tr>
+        <tr>
+          <td>Marcaciones</td>
+          <td><span class="badge ok">GET</span></td>
+          <td><span class="badge no">No</span></td>
+          <td><span class="badge no">No</span></td>
+          <td><span class="badge no">No</span></td>
+          <td><span class="badge no">No</span></td>
+        </tr>
+        <tr>
+          <td>Ranking</td>
+          <td><span class="badge ok">GET</span></td>
+          <td>—</td>
+          <td>—</td>
+          <td>—</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td>Snapshots de ranking</td>
+          <td><span class="badge ok">GET</span></td>
+          <td><span class="badge ok">GET {id}</span></td>
+          <td><span class="badge info">POST generar</span></td>
+          <td><span class="badge info">PATCH restaurar</span></td>
+          <td><span class="badge no">DELETE lógico</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="note">Alta de practicantes, horarios, justificaciones y marcaciones se hacen en Discord / MySQL, no por esta API.</p>
+  </div>
+
+  <h2 id="enums">5. Enumeraciones</h2>
+  <div class="grid2">
+    <div class="card">
+      <h3 style="margin-top:0">Áreas</h3>
+      <code>software</code> · <code>video</code> · <code>admin</code> · <code>marketing</code> · <code>fotografia</code> · <code>diseno</code>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Estado practicante</h3>
+      <code>activo</code> · <code>cesado</code> · <code>suspendido</code>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Estado del bot</h3>
+      <code>ACTIVO</code> · <code>MANTENIMIENTO</code> · <code>DESACTIVADO</code>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Periodo</h3>
+      <code>semana</code> · <code>mes</code> · <code>total</code>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Criterio ranking</h3>
+      <code>asistencia</code> · <code>puntualidad</code> · <code>horas</code> · <code>nota</code>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Estado jornada</h3>
+      <code>ABIERTA</code> · <code>CERRADA</code> · <code>FALTA</code> · <code>LICENCIA</code> · <code>VACACIONES</code> · <code>NO_LABORABLE</code> · <code>FALTA_JUSTIFICADA</code>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Estado entrada</h3>
+      <code>PUNTUAL</code> · <code>PUNTUAL_ANTICIPADO</code> · <code>TARDANZA</code> · <code>FUERA_DE_HORARIO</code> · <code>SIN_MARCA</code>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Estado salida</h3>
+      <code>PUNTUAL</code> · <code>SALIDA_ANTICIPADA</code> · <code>FUERA_DE_HORA_SALIDA</code> · <code>SIN_SALIDA</code>
+    </div>
+  </div>
+
+  <!-- ENDPOINTS -->
+  <h2>6. Endpoints</h2>
+
+  <article class="endpoint" id="e-root">
+    <div class="head"><span class="badge pub">Público</span><span class="m m-get">GET</span><span class="path">/</span></div>
+    <div class="body">
+      <p>Descubrimiento mínimo. Sin API key.</p>
+<pre>{
+  "data": {
+    "servicio": "Bot de Asistencias MTA",
+    "health": "/api/v1/bot/health",
+    "api": "/api/v1"
+  }
+}</pre>
+    </div>
+  </article>
+
+  <article class="endpoint" id="e-catalog">
+    <div class="head"><span class="badge auth">API key</span><span class="m m-get">GET</span><span class="path">/api/v1</span> <span class="muted">o /api</span></div>
+    <div class="body">
+      <p>Catálogo corto de rutas. El ERP puede usarlo como smoke test autenticado.</p>
+    </div>
+  </article>
+
+  <article class="endpoint" id="e-health">
+    <div class="head"><span class="badge pub">Público</span><span class="m m-get">GET</span><span class="path">/api/v1/bot/health</span> <span class="muted">alias /health</span></div>
+    <div class="body">
+      <p>Healthcheck de Railway. <strong>200</strong> si Discord y MySQL OK; <strong>503</strong> si alguno falla.</p>
+<pre><button class="copy" type="button">Copiar</button>curl -s https://mtaasistenciabot-production.up.railway.app/api/v1/bot/health</pre>
+<pre>{
+  "data": {
+    "status": "ok",
+    "discord": "OK",
+    "base_datos": "OK",
+    "version": "2.2.0",
+    "uptime_segundos": 3600
+  }
+}</pre>
+    </div>
+  </article>
+
+  <article class="endpoint" id="e-estado-get">
+    <div class="head"><span class="badge auth">API key</span><span class="m m-get">GET</span><span class="path">/api/v1/bot/estado</span></div>
+    <div class="body">
+      <p>Estado operativo. Al consultarlo el bot actualiza <code>ultima_sincronizacion</code> (polling del ERP).</p>
+<pre><button class="copy" type="button">Copiar</button>curl -s -H "x-api-key: $BOT_API_KEY" \
+  https://mtaasistenciabot-production.up.railway.app/api/v1/bot/estado</pre>
+<pre>{
+  "data": {
+    "estado": "ACTIVO",
+    "mensaje": null,
+    "programado_hasta": null,
+    "version": "2.2.0",
+    "uptime_segundos": 120,
+    "latencia_ms": 42,
+    "conexiones": { "base_datos": "OK", "api_erp": "OK", "discord": "OK" },
+    "ultima_sincronizacion": "2026-08-31T22:00:00.000Z",
+    "actualizado_en": "2026-08-31T12:00:00.000Z",
+    "actualizado_por": { "nombre": "ERP" }
+  }
+}</pre>
+    </div>
+  </article>
+
+  <article class="endpoint" id="e-estado-put">
+    <div class="head"><span class="badge auth">API key</span><span class="m m-put">PUT</span><span class="path">/api/v1/bot/estado</span></div>
+    <div class="body">
+      <p>Cambia el estado. Origen queda como <code>ERP</code>. Por defecto notifica el canal de Discord.</p>
+      <table>
+        <tr><th>estado</th><td>obligatorio · <code>ACTIVO | MANTENIMIENTO | DESACTIVADO</code></td></tr>
+        <tr><th>mensaje</th><td>obligatorio si no es ACTIVO (máx. 255)</td></tr>
+        <tr><th>programado_hasta</th><td>ISO-8601 futuro, opcional</td></tr>
+        <tr><th>permitir_admins</th><td>boolean, opcional</td></tr>
+        <tr><th>notificar_canal</th><td>boolean, default <code>true</code></td></tr>
+      </table>
+<pre><button class="copy" type="button">Copiar</button>curl -s -X PUT -H "x-api-key: $BOT_API_KEY" -H "Content-Type: application/json" \
+  -d '{"estado":"MANTENIMIENTO","mensaje":"Corte de red 22:00–22:30","programado_hasta":"2026-08-31T22:30:00-05:00"}' \
+  https://mtaasistenciabot-production.up.railway.app/api/v1/bot/estado</pre>
+      <p>Códigos: <code>400</code> estado/mensaje inválido · <code>409</code> sin cambios · <code>422</code> fecha no futura · <code>200</code> mismo objeto que GET.</p>
+    </div>
+  </article>
+
+  <article class="endpoint" id="e-activar">
+    <div class="head"><span class="badge auth">API key</span><span class="m m-post">POST</span><span class="path">/api/v1/bot/estado/activar</span></div>
+    <div class="body"><p>Atajo a <code>PUT</code> con <code>ACTIVO</code> y notificación al canal. Sin body.</p></div>
+  </article>
+
+  <article class="endpoint" id="e-mant">
+    <div class="head"><span class="badge auth">API key</span><span class="m m-post">POST</span><span class="path">/api/v1/bot/estado/mantenimiento</span></div>
+    <div class="body">
+      <p>Body opcional: <code>mensaje</code>, <code>programado_hasta</code>, <code>notificar_canal</code>. Default mensaje: <em>El bot está en mantenimiento.</em></p>
+    </div>
+  </article>
+
+  <article class="endpoint" id="e-desact">
+    <div class="head"><span class="badge auth">API key</span><span class="m m-post">POST</span><span class="path">/api/v1/bot/estado/desactivar</span></div>
+    <div class="body">
+      <p>Body opcional: <code>mensaje</code> (default <em>Fuera de servicio</em>), <code>notificar_canal</code>.</p>
+    </div>
+  </article>
+
+  <article class="endpoint" id="e-hist">
+    <div class="head"><span class="badge auth">API key</span><span class="m m-get">GET</span><span class="path">/api/v1/bot/estado/historial</span></div>
+    <div class="body">
+      <table>
+        <tr><th>desde</th><td>ISO fecha/hora, opcional</td></tr>
+        <tr><th>hasta</th><td>ISO fecha/hora, opcional</td></tr>
+        <tr><th>estado</th><td>filtro del estado nuevo</td></tr>
+        <tr><th>usuario_id</th><td>id de <code>usuarios</code></td></tr>
+        <tr><th>page</th><td>default 1</td></tr>
+        <tr><th>per_page</th><td>default 20</td></tr>
+      </table>
+<pre>{
+  "data": [{
+    "id": 12,
+    "estado_anterior": "ACTIVO",
+    "estado_nuevo": "MANTENIMIENTO",
+    "mensaje": "Corte de red",
+    "programado_hasta": "2026-08-31T22:30:00.000Z",
+    "origen": "ERP",
+    "usuario_id": null,
+    "usuario": null,
+    "notificado_canal": true,
+    "creado_en": "2026-08-31T21:00:00.000Z"
+  }],
+  "meta": { "page": 1, "per_page": 20, "total": 1 }
+}</pre>
+    </div>
+  </article>
+
+  <article class="endpoint" id="e-hist-id">
+    <div class="head"><span class="badge auth">API key</span><span class="m m-get">GET</span><span class="path">/api/v1/bot/estado/historial/{id}</span></div>
+    <div class="body"><p>Un registro. <code>404</code> si no existe o está anulado.</p></div>
+  </article>
+
+  <article class="endpoint" id="e-config-get">
+    <div class="head"><span class="badge auth">API key</span><span class="m m-get">GET</span><span class="path">/api/v1/config</span></div>
+    <div class="body">
+      <p>Lista <code>config_sistema</code>. Cada ítem indica si el ERP puede editarlo.</p>
+<pre>{
+  "data": [
+    { "clave": "asistencia.fecha_inicio", "valor": "2026-08-17", "descripcion": "...", "editable": true }
+  ]
+}</pre>
+    </div>
+  </article>
+
+  <article class="endpoint" id="e-config-put">
+    <div class="head"><span class="badge auth">API key</span><span class="m m-put">PUT</span><span class="path">/api/v1/config</span></div>
+    <div class="body">
+      <p>Body: objeto plano de claves, o <code>{ "variables": { ... } }</code>. Solo claves de la lista editable. <code>422</code> si alguna falla (no aplica ninguna).</p>
+<pre><button class="copy" type="button">Copiar</button>curl -s -X PUT -H "x-api-key: $BOT_API_KEY" -H "Content-Type: application/json" \
+  -d '{"asistencia.fecha_inicio":"2026-08-17","ranking.limite_default":"10"}' \
+  https://mtaasistenciabot-production.up.railway.app/api/v1/config</pre>
+    </div>
+  </article>
+
+  <article class="endpoint" id="e-prac">
+    <div class="head"><span class="badge auth">API key</span><span class="m m-get">GET</span><span class="path">/api/v1/practicantes</span></div>
+    <div class="body">
+      <table>
+        <tr><th>estado</th><td><code>activo | cesado | suspendido</code></td></tr>
+        <tr><th>area</th><td>enum de áreas</td></tr>
+      </table>
+      <p><span class="badge warn">camelCase</span> en la respuesta.</p>
+<pre><button class="copy" type="button">Copiar</button>curl -s -H "x-api-key: $BOT_API_KEY" \
+  "https://mtaasistenciabot-production.up.railway.app/api/v1/practicantes?estado=activo&amp;area=software"</pre>
+<pre>{
+  "data": [{
+    "id": 9,
+    "discordId": "1234567890",
+    "discordUsername": "kevinludena",
+    "nombres": "Kevin",
+    "apellidos": "Ludeña",
+    "nombre": "Kevin Ludeña",
+    "area": "software",
+    "estado": "activo",
+    "carrera": "Desarrollo de software",
+    "ciclo": "6to",
+    "fechaInicio": "2026-08-17"
+  }]
+}</pre>
+    </div>
+  </article>
+
+  <article class="endpoint" id="e-resumen">
+    <div class="head"><span class="badge auth">API key</span><span class="m m-get">GET</span><span class="path">/api/v1/practicantes/{id}/resumen</span></div>
+    <div class="body">
+      <p>Mismo motor que <code>/stats</code> en Discord (ventana efectiva ESPEC-ASIS-003). <code>404</code> si no existe el id.</p>
+      <table>
+        <tr><th>periodo</th><td><code>semana | mes | total</code> · default <code>mes</code></td></tr>
+      </table>
+<pre><button class="copy" type="button">Copiar</button>curl -s -H "x-api-key: $BOT_API_KEY" \
+  "https://mtaasistenciabot-production.up.railway.app/api/v1/practicantes/9/resumen?periodo=mes"</pre>
+<pre>{
+  "data": {
+    "practicante": {
+      "id": 9, "discord_id": "…", "nombre": "Kevin Ludeña",
+      "area": "software", "estado": "activo",
+      "fecha_inicio": "2026-08-17", "fecha_fin": null
+    },
+    "periodo": "mes",
+    "periodo_label": "Agosto 2026 (desde el 17)",
+    "desde": "2026-08-17",
+    "hasta": "2026-08-31",
+    "nivel": 1,
+    "horas_historicas": 66,
+    "ranking": { "posicion": 2, "total": 14 },
+    "asistencia": {
+      "puntuales": 11, "tardanzas": 0, "faltas": 0,
+      "programadas": 11, "asistidas": 11, "pendientes": 0
+    },
+    "horas": { "acumuladas": 66, "semana": 30, "meta_semana": 30, "por_justificar": 0 },
+    "indicadores": {
+      "pct_asistencia": 100, "pct_puntualidad": 100, "pct_horas": 100,
+      "nota": 20, "nota_mes": null
+    },
+    "recuperaciones": { "cumplidas": 0, "pendientes": 0 }
+  }
+}</pre>
+      <p class="note">En <code>periodo=semana</code>, <code>indicadores.nota</code> es la <strong>nota del mes</strong> (referencia), no una nota semanal.</p>
+    </div>
+  </article>
+
+  <article class="endpoint" id="e-jornadas">
+    <div class="head"><span class="badge auth">API key</span><span class="m m-get">GET</span><span class="path">/api/v1/jornadas</span></div>
+    <div class="body">
+      <p>Solo contexto <code>REGULAR</code>. <span class="badge warn">camelCase</span>. Horas de marca en <code>America/Lima</code>.</p>
+      <table>
+        <tr><th>practicante_id</th><td>número</td></tr>
+        <tr><th>desde / hasta</th><td>YYYY-MM-DD</td></tr>
+        <tr><th>page</th><td>default 1</td></tr>
+        <tr><th>per_page</th><td>default 50, máx. 100</td></tr>
+      </table>
+<pre><button class="copy" type="button">Copiar</button>curl -s -H "x-api-key: $BOT_API_KEY" \
+  "https://mtaasistenciabot-production.up.railway.app/api/v1/jornadas?practicante_id=9&amp;desde=2026-08-24&amp;hasta=2026-08-31"</pre>
+<pre>{
+  "data": [{
+    "id": 401,
+    "practicanteId": 9,
+    "fecha": "2026-08-31",
+    "horaEntrada": "08:57:26",
+    "horaSalida": "15:02:10",
+    "estadoEntrada": "PUNTUAL",
+    "estadoSalida": "PUNTUAL",
+    "estadoJornada": "CERRADA",
+    "horasComputadas": 6,
+    "horasJustificadas": 0,
+    "horasPorJustificar": 0
+  }],
+  "meta": { "page": 1, "per_page": 50, "total": 6 }
+}</pre>
+      <p class="note"><code>horaEntrada</code> es <code>null</code> si <code>SIN_MARCA</code>. <code>horaSalida</code> es <code>null</code> si <code>SIN_SALIDA</code> (jornada abierta).</p>
+    </div>
+  </article>
+
+  <article class="endpoint" id="e-horario">
+    <div class="head"><span class="badge auth">API key</span><span class="m m-get">GET</span><span class="path">/api/v1/practicantes/{id}/horario</span> <span class="muted">alias GET /horarios?practicante_id=</span></div>
+    <div class="body">
+      <p>Bloques semanales vigentes. <code>day</code>: 1 = lunes … 7 = domingo. Si no hay asignación, fallback 09:00–15:00 lun–vie. <code>404</code> si el practicante no existe. Alias: <code>GET /api/v1/horarios?practicante_id=</code> (400 si falta el id).</p>
+<pre><button class="copy" type="button">Copiar</button>curl -s -H "x-api-key: $BOT_API_KEY" \
+  "https://mtaasistenciabot-production.up.railway.app/api/v1/practicantes/14/horario"</pre>
+<pre>{
+  "data": {
+    "practicanteId": 14,
+    "displayName": "zkingwolfx",
+    "weeklyScheduledHours": 30,
+    "blocks": [
+      { "day": 1, "dayLabel": "Lunes", "start": "09:00", "end": "15:00", "hours": 6 },
+      { "day": 2, "dayLabel": "Martes", "start": "09:00", "end": "15:00", "hours": 6 }
+    ]
+  }
+}</pre>
+    </div>
+  </article>
+
+  <article class="endpoint" id="e-marcaciones">
+    <div class="head"><span class="badge auth">API key</span><span class="m m-get">GET</span><span class="path">/api/v1/marcaciones</span></div>
+    <div class="body">
+      <p>Hechos crudos de entrada/salida. Fecha y <code>horaLocal</code> en Lima. <span class="badge warn">camelCase</span>.</p>
+      <table>
+        <tr><th>practicante_id</th><td>opcional</td></tr>
+        <tr><th>desde / hasta</th><td>YYYY-MM-DD (calendario Lima)</td></tr>
+        <tr><th>tipo</th><td><code>ENTRADA | SALIDA</code></td></tr>
+        <tr><th>page / per_page</th><td>igual que jornadas (máx. 100)</td></tr>
+      </table>
+<pre><button class="copy" type="button">Copiar</button>curl -s -H "x-api-key: $BOT_API_KEY" \
+  "https://mtaasistenciabot-production.up.railway.app/api/v1/marcaciones?practicante_id=14&amp;desde=2026-09-01&amp;hasta=2026-09-01"</pre>
+<pre>{
+  "data": [{
+    "id": 9001,
+    "practicanteId": 14,
+    "jornadaId": 190,
+    "fecha": "2026-09-01",
+    "tipo": "ENTRADA",
+    "registradoEn": "2026-09-01T09:00:07-05:00",
+    "horaLocal": "09:00:07",
+    "origen": "DISCORD"
+  }],
+  "meta": { "page": 1, "per_page": 50, "total": 1 }
+}</pre>
+    </div>
+  </article>
+
+  <article class="endpoint" id="e-ranking">
+    <div class="head"><span class="badge auth">API key</span><span class="m m-get">GET</span><span class="path">/api/v1/reportes/ranking</span></div>
+    <div class="body">
+      <p>Mismo motor que <code>/top</code>. Caché ~5 minutos. Ventana efectiva + mínimo de días.</p>
+      <table>
+        <tr><th>periodo</th><td><code>semana | mes | total</code> · default <code>mes</code></td></tr>
+        <tr><th>criterio</th><td><code>asistencia | puntualidad | horas | nota</code> · default <code>asistencia</code></td></tr>
+        <tr><th>area</th><td>enum; omitir = todas. <code>area_id</code> no se usa (400 si viene solo).</td></tr>
+        <tr><th>limite</th><td>entero 3–100 · default 10</td></tr>
+        <tr><th>incluir_cesados</th><td><code>true|1</code> · en <code>total</code> ya se incluyen</td></tr>
+        <tr><th>practicante_id</th><td>rellena <code>posicion_solicitada</code></td></tr>
+        <tr><th>fecha_referencia</th><td>YYYY-MM-DD para simular “hoy”</td></tr>
+      </table>
+<pre><button class="copy" type="button">Copiar</button>curl -s -H "x-api-key: $BOT_API_KEY" \
+  "https://mtaasistenciabot-production.up.railway.app/api/v1/reportes/ranking?periodo=mes&amp;criterio=asistencia&amp;limite=10"</pre>
+<pre>{
+  "data": {
+    "periodo": {
+      "tipo": "mes",
+      "nominal_inicio": "2026-08-01",
+      "nominal_fin": "2026-08-31",
+      "efectivo_inicio": "2026-08-17",
+      "efectivo_fin": "2026-08-31"
+    },
+    "criterio": "asistencia",
+    "area": null,
+    "total_practicantes": 17,
+    "total_calificados": 14,
+    "no_calificados": 3,
+    "dias_minimos_exigidos": 5,
+    "ranking": [{
+      "posicion": 1,
+      "practicante_id": 7,
+      "nombre": "Taylor Aguirre",
+      "discord_id": "…",
+      "area": "diseno",
+      "estado": "activo",
+      "dias_programados": 11,
+      "dias_asistidos": 11,
+      "dias_puntuales": 11,
+      "tardanzas": 0,
+      "faltas": 0,
+      "pct_asistencia": 100,
+      "pct_puntualidad": 100,
+      "pct_horas": 100,
+      "horas_acumuladas": 66,
+      "nota": 20,
+      "posicion_anterior": null,
+      "movimiento": null
+    }],
+    "posicion_solicitada": null
+  },
+  "meta": { "calculado_en": "2026-08-31T22:15:00.000Z", "cache_ttl_segundos": 300 }
+}</pre>
+      <p><code>movimiento</code> es <code>null</code> (🆕) si no hay snapshot del periodo anterior. Positivo = subió.</p>
+    </div>
+  </article>
+
+  <article class="endpoint" id="e-snap-list">
+    <div class="head"><span class="badge auth">API key</span><span class="m m-get">GET</span><span class="path">/api/v1/reportes/ranking/snapshots</span></div>
+    <div class="body">
+      <p>Filas de <code>ranking_snapshots</code> no anuladas (máx. 500).</p>
+      <table>
+        <tr><th>periodo</th><td><code>semana | mes | total</code> (se guarda como SEMANA/MES/TOTAL)</td></tr>
+        <tr><th>desde / hasta</th><td>filtra <code>periodo_inicio</code></td></tr>
+        <tr><th>area</th><td>incluye <code>todas</code> o un enum</td></tr>
+      </table>
+      <p><span class="badge warn">camelCase</span> en cada fila: <code>tipoPeriodo</code>, <code>periodoInicio</code>, <code>practicanteId</code>, <code>generadoEn</code>, <code>deletedAt</code>, …</p>
+    </div>
+  </article>
+
+  <article class="endpoint" id="e-snap-id">
+    <div class="head"><span class="badge auth">API key</span><span class="m m-get">GET</span><span class="path">/api/v1/reportes/ranking/snapshots/{id}</span></div>
+    <div class="body"><p>Una fila, aunque esté anulada. <code>404</code> si el id no existe.</p></div>
+  </article>
+
+  <article class="endpoint" id="e-snap-post">
+    <div class="head"><span class="badge auth">API key</span><span class="m m-post">POST</span><span class="path">/api/v1/reportes/ranking/snapshots</span></div>
+    <div class="body">
+      <p>Genera y persiste el ranking actual (hasta 100 puestos). El job del bot también lo hace domingo 23:59 y el último día del mes 23:59 (Lima).</p>
+<pre>{
+  "periodo": "mes",
+  "criterio": "asistencia",
+  "area": null
+}</pre>
+      <p>Respuesta 200: mismo cuerpo que <code>GET /reportes/ranking</code>.</p>
+    </div>
+  </article>
+
+  <article class="endpoint" id="e-snap-patch">
+    <div class="head"><span class="badge auth">API key</span><span class="m m-patch">PATCH</span><span class="path">/api/v1/reportes/ranking/snapshots/{id}</span></div>
+    <div class="body">
+      <p>Restaurar un snapshot anulado:</p>
+<pre>{ "anulado": false }</pre>
+      <p>o <code>{ "deleted_at": null }</code>. Otro body → <code>400 Nada que actualizar.</code></p>
+    </div>
+  </article>
+
+  <article class="endpoint" id="e-snap-del">
+    <div class="head"><span class="badge auth">API key</span><span class="m m-del">DELETE</span><span class="path">/api/v1/reportes/ranking/snapshots/{id}</span></div>
+    <div class="body">
+      <p>Anulación lógica (<code>deleted_at</code>). No borra la fila.</p>
+<pre>{ "data": { "id": 88, "anulado": true } }</pre>
+    </div>
+  </article>
+
+  <h2 id="config-keys">7. Claves de configuración editables</h2>
+  <div class="card">
+    <table>
+      <tr><th>Clave</th><th>Tipo</th><th>Uso</th></tr>
+      <tr><td><code>timezone</code></td><td>string</td><td>IANA, p. ej. America/Lima</td></tr>
+      <tr><td><code>nota_peso_asistencia</code></td><td>0–1</td><td>Peso de la nota (alias <code>nota.peso_asistencia</code> en lectura)</td></tr>
+      <tr><td><code>nota_peso_puntualidad</code></td><td>0–1</td><td></td></tr>
+      <tr><td><code>nota_peso_horas</code></td><td>0–1</td><td></td></tr>
+      <tr><td><code>alerta_limite_horas_pct</code></td><td>1–100</td><td></td></tr>
+      <tr><td><code>limite_horas_semana_default</code></td><td>1–80</td><td></td></tr>
+      <tr><td><code>hours_per_level</code></td><td>10–1000</td><td>Horas para subir de nivel en /stats</td></tr>
+      <tr><td><code>asistencia.fecha_inicio</code></td><td>YYYY-MM-DD</td><td>Nada anterior se evalúa (hoy 2026-08-17)</td></tr>
+      <tr><td><code>asistencia.contar_dia_en_curso</code></td><td>0|1</td><td>Si hoy cuenta como falta antes de cerrar ventana</td></tr>
+      <tr><td><code>nota.periodo_base</code></td><td>MES|SEMANA|TOTAL</td><td></td></tr>
+      <tr><td><code>ranking.dias_minimos</code></td><td>1–20</td><td>Piso absoluto para calificar en /top</td></tr>
+      <tr><td><code>ranking.pct_dias_minimos</code></td><td>0–1</td><td>Default 0.40</td></tr>
+      <tr><td><code>ranking.limite_default</code></td><td>int</td><td>Default 10</td></tr>
+      <tr><td><code>ranking.mostrar_menciones</code></td><td>0|1</td><td>@ en Discord</td></tr>
+      <tr><td><code>ranking.cache_segundos</code></td><td>int</td><td>Default 300</td></tr>
+    </table>
+    <p><code>schema_spec</code> es de solo lectura.</p>
+  </div>
+
+  <h2 id="ejemplos">8. Cliente mínimo (TypeScript / fetch)</h2>
+  <div class="card">
+<pre><button class="copy" type="button">Copiar</button>const BASE = "https://mtaasistenciabot-production.up.railway.app";
+const KEY = process.env.BOT_API_KEY!;
+
+async function botGet(path: string) {
+  const res = await fetch(`${BASE}${path}`, {
+    headers: { "x-api-key": KEY },
+  });
+  const json = await res.json();
+  if (!res.ok) throw Object.assign(new Error(json.error?.message ?? res.statusText), { status: res.status, json });
+  return json;
+}
+
+async function botSend(method: string, path: string, body?: unknown) {
+  const res = await fetch(`${BASE}${path}`, {
+    method,
+    headers: { "x-api-key": KEY, "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const json = await res.json();
+  if (!res.ok) throw Object.assign(new Error(json.error?.message ?? res.statusText), { status: res.status, json });
+  return json;
+}
+
+// Lectura
+const activos = await botGet("/api/v1/practicantes?estado=activo");
+const kevin = await botGet("/api/v1/practicantes/9/resumen?periodo=mes");
+const top = await botGet("/api/v1/reportes/ranking?periodo=mes&amp;limite=10");
+const dias = await botGet("/api/v1/jornadas?practicante_id=9&amp;desde=2026-08-01&amp;hasta=2026-08-31");
+const horario = await botGet("/api/v1/practicantes/9/horario");
+const marcas = await botGet("/api/v1/marcaciones?practicante_id=9&amp;desde=2026-08-01&amp;hasta=2026-08-31");
+
+// Operación
+await botSend("POST", "/api/v1/bot/estado/activar");
+await botSend("PUT", "/api/v1/config", { "ranking.limite_default": "15" });</pre>
+  </div>
+
+  <h2 id="fuera">9. Fuera de alcance en esta API (especificado, no implementado)</h2>
+  <div class="card">
+    <p>La spec ESPEC-ASIS-001 describe un ERP más amplio. <strong>El bot no expone aún</strong> estos recursos. No los invoquéis: responderán <code>404 Ruta no encontrada.</code></p>
+    <table>
+      <tr><th>Grupo</th><th>Rutas previstas, no vivas</th></tr>
+      <tr><td>Auth JWT</td><td><code>POST /auth/token</code>, <code>/auth/refresh</code></td></tr>
+      <tr><td>Marcaciones write</td><td><code>POST /marcaciones</code> (el listado GET sí existe)</td></tr>
+      <tr><td>CRUD practicantes</td><td><code>POST /practicantes</code>, <code>PATCH /practicantes/{id}</code></td></tr>
+      <tr><td>Horarios write</td><td>asignaciones, excepciones (el GET de bloques sí existe)</td></tr>
+      <tr><td>Justificaciones / recuperaciones</td><td>POST sobre jornada, pendientes</td></tr>
+      <tr><td>Reportes extra</td><td>diario, semanal, mensual, export xlsx/pdf</td></tr>
+      <tr><td>Webhooks salientes</td><td>el bot no notifica al ERP; el ERP hace polling</td></tr>
+      <tr><td>Historial estado write</td><td>POST/PATCH/DELETE de historial (solo GET)</td></tr>
+    </table>
+    <p class="note">Si el ERP necesita alta de practicantes o justificar faltas, hay que ampliar esta API o hacerlo en MySQL / Discord. No hay puente oculto.</p>
+  </div>
+
+  <footer>
+    MTA SOFTWARE — MULTISERVICIOS TECNOINDUSTRIAL ACOSTA S.A.C. ·
+    Generado desde <code>src/http/apiServer.ts</code> · septiembre 2026
+  </footer>
+</main>
+</div>
+<script>
+  const input = document.getElementById("q");
+  input.addEventListener("input", () => {
+    const q = input.value.trim().toLowerCase();
+    document.querySelectorAll("nav a").forEach((a) => {
+      a.style.display = !q || a.textContent.toLowerCase().includes(q) ? "" : "none";
+    });
+  });
+  document.querySelectorAll("pre .copy").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const pre = btn.parentElement;
+      const text = pre.innerText.replace(/^Copiar\n?/, "");
+      await navigator.clipboard.writeText(text);
+      btn.textContent = "Listo";
+      setTimeout(() => { btn.textContent = "Copiar"; }, 1200);
+    });
+  });
+</script>
+</body>
+</html>
