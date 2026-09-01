@@ -12,7 +12,8 @@ import { buildAttendanceButtonRow } from '../components/attendanceButtons';
 import { buildAttendancePanelEmbed } from '../embeds/response.embeds';
 import { AttendanceService } from '../services/attendanceService';
 import { BotStateService } from '../services/botStateService';
-import { scheduleAutoClose } from '../services/autoCloseJob';
+import { RankingService } from '../services/rankingService';
+import { scheduleAutoClose, scheduleRankingSnapshots } from '../services/autoCloseJob';
 import { ScheduleService } from '../services/scheduleService';
 import { logger } from '../utils/logger';
 
@@ -96,6 +97,7 @@ export function registerReadyWithInit(
   attendanceService: AttendanceService,
   scheduleService: ScheduleService,
   botStateService: BotStateService,
+  rankingService: RankingService,
   config: AppConfig,
 ): void {
   client.once(Events.ClientReady, async (readyClient) => {
@@ -110,6 +112,7 @@ export function registerReadyWithInit(
         config.timezone,
         BUSINESS_RULES.autoClose.cronExpression,
       );
+      scheduleRankingSnapshots(rankingService, config.timezone);
       await ensureAttendancePanel(
         readyClient,
         config.discord.attendanceChannelId,

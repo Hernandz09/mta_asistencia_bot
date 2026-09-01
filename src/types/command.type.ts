@@ -7,6 +7,7 @@ import {
 import { AttendanceService } from '../services/attendanceService';
 import { BotStateService } from '../services/botStateService';
 import { ScheduleService } from '../services/scheduleService';
+import { RankingService } from '../services/rankingService';
 import { StatsService } from '../services/statsService';
 
 export type SlashCommandData =
@@ -19,6 +20,7 @@ export interface CommandContext {
   attendanceService: AttendanceService;
   scheduleService: ScheduleService;
   statsService: StatsService;
+  rankingService: RankingService;
   botStateService: BotStateService;
   adminRoleId?: string;
   attendanceChannelId?: string;

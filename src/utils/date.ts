@@ -169,6 +169,27 @@ export function eachDateInclusive(startDate: string, endDate: string): string[] 
   return dates;
 }
 
+export function addDays(isoDate: string, days: number): string {
+  const [year, month, day] = isoDate.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + days);
+  return formatUtcDate(date);
+}
+
+export function getPreviousCalendarMonthRange(monthStart: string): {
+  startDate: string;
+  endDate: string;
+} {
+  const [year, month] = monthStart.split('-').map(Number);
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevYear = month === 1 ? year - 1 : year;
+  const last = new Date(Date.UTC(prevYear, prevMonth, 0));
+  return {
+    startDate: `${String(prevYear).padStart(4, '0')}-${String(prevMonth).padStart(2, '0')}-01`,
+    endDate: formatUtcDate(last),
+  };
+}
+
 /** America/Lima no usa DST: UTC−5. Convierte fecha+hora locales a UTC. */
 export function limaLocalToUtc(date: string, time: string): Date {
   const [year, month, day] = date.split('-').map(Number);

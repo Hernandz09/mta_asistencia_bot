@@ -19,6 +19,11 @@ const EDITABLE = new Set([
   'asistencia.fecha_inicio',
   'asistencia.contar_dia_en_curso',
   'nota.periodo_base',
+  'ranking.dias_minimos',
+  'ranking.pct_dias_minimos',
+  'ranking.limite_default',
+  'ranking.mostrar_menciones',
+  'ranking.cache_segundos',
 ]);
 
 const READONLY = new Set(['schema_spec']);
@@ -47,6 +52,33 @@ function validateValor(clave: string, valor: string): string | null {
     return ['MES', 'SEMANA', 'TOTAL'].includes(trimmed.toUpperCase())
       ? null
       : 'nota.periodo_base debe ser MES, SEMANA o TOTAL.';
+  }
+
+  if (clave === 'ranking.mostrar_menciones') {
+    return trimmed === '0' || trimmed === '1'
+      ? null
+      : 'ranking.mostrar_menciones debe ser 0 o 1.';
+  }
+
+  if (clave === 'ranking.dias_minimos') {
+    const n = Number(trimmed);
+    return Number.isInteger(n) && n >= 1 && n <= 20
+      ? null
+      : 'ranking.dias_minimos debe ser un entero entre 1 y 20.';
+  }
+
+  if (clave === 'ranking.limite_default' || clave === 'ranking.cache_segundos') {
+    const n = Number(trimmed);
+    return Number.isInteger(n) && n >= 1
+      ? null
+      : `"${clave}" debe ser un entero positivo.`;
+  }
+
+  if (clave === 'ranking.pct_dias_minimos') {
+    const n = Number(trimmed);
+    return n >= 0 && n <= 1
+      ? null
+      : 'ranking.pct_dias_minimos debe estar entre 0 y 1.';
   }
 
   const numeric = Number(trimmed);
@@ -129,6 +161,23 @@ export class ConfigService {
     return (map['asistencia.contar_dia_en_curso'] ?? '0') === '1';
   }
 
+  async getRankingConfig(): Promise<{
+    diasMinimos: number;
+    pctDiasMinimos: number;
+    limiteDefault: number;
+    mostrarMenciones: boolean;
+    cacheSegundos: number;
+  }> {
+    const map = await this.getMap();
+    return {
+      diasMinimos: Number(map['ranking.dias_minimos'] ?? 3),
+      pctDiasMinimos: Number(map['ranking.pct_dias_minimos'] ?? 0.4),
+      limiteDefault: Number(map['ranking.limite_default'] ?? 10),
+      mostrarMenciones: (map['ranking.mostrar_menciones'] ?? '0') === '1',
+      cacheSegundos: Number(map['ranking.cache_segundos'] ?? 300),
+    };
+  }
+
   async getHoursPerLevel(): Promise<number> {
     const map = await this.getMap();
     const value = Number(map.hours_per_level);
@@ -180,7 +229,12 @@ export class ConfigService {
          ('hours_per_level', ?, 'Horas acumuladas para subir un nivel en /stats'),
          ('asistencia.fecha_inicio', '2026-08-17', 'Primera fecha con registro de asistencias'),
          ('asistencia.contar_dia_en_curso', '0', 'Si el día de hoy entra al denominador antes de cerrar su ventana'),
-         ('nota.periodo_base', 'MES', 'Periodo sobre el que se calcula la nota oficial')
+         ('nota.periodo_base', 'MES', 'Periodo sobre el que se calcula la nota oficial'),
+         ('ranking.dias_minimos', '3', 'Días evaluados mínimos para calificar en /top'),
+         ('ranking.pct_dias_minimos', '0.40', 'Porcentaje del periodo exigido para calificar'),
+         ('ranking.limite_default', '10', 'Cantidad de posiciones por defecto en /top'),
+         ('ranking.mostrar_menciones', '0', 'Si el top menciona con @ a los practicantes'),
+         ('ranking.cache_segundos', '300', 'TTL del ranking en caché')
        ON DUPLICATE KEY UPDATE descripcion = VALUES(descripcion)`,
       [String(HOURS_PER_LEVEL)],
     );

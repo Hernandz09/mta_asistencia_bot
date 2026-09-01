@@ -22,6 +22,7 @@ import {
   summarizePeriod,
 } from './statsMath';
 import { ConfigService } from './configService';
+import { RankingService } from './rankingService';
 
 const CACHE_TTL_MS = 60_000;
 
@@ -112,6 +113,7 @@ export class StatsService {
     private readonly pool: Pool,
     private readonly timezone: string,
     private readonly configService?: ConfigService,
+    private readonly rankingService?: RankingService,
   ) {}
 
   async findPracticanteByDiscord(
@@ -246,13 +248,19 @@ export class StatsService {
       allTimeHours,
       hoursPerLevel,
     );
-    const ranking = await this.computeRanking(practicante, nominal, {
-      globalStart,
-      today,
-      nowMinutes: ctx.nowMinutes,
-      contarDiaEnCurso,
-      weights,
-    });
+    const ranking = this.rankingService
+      ? await this.rankingService.getPositionFor(
+          practicante.discordId,
+          periodo,
+          practicante.area,
+        )
+      : await this.computeRanking(practicante, nominal, {
+          globalStart,
+          today,
+          nowMinutes: ctx.nowMinutes,
+          contarDiaEnCurso,
+          weights,
+        });
 
     let notaMes: number | null = null;
     if (periodo === 'semana' && window) {

@@ -78,6 +78,7 @@ export const COMMAND_NAMES = {
   STATS: 'stats',
   ESTADISTICAS: 'estadisticas',
   STATUS: 'status',
+  TOP: 'top',
 } as const;
 
 export const BUTTON_CUSTOM_IDS = {
@@ -95,8 +96,53 @@ export const STATUS_CUSTOM_IDS = {
   CAMBIAR: 'bot_estado_cambiar',
 } as const;
 
+export const TOP_CUSTOM_IDS = {
+  PERIODO: 'top_periodo',
+  AREA: 'top_area',
+  CRITERIO: 'top_criterio',
+  DETALLE: 'top_detalle',
+  SEL_PERIODO: 'top_sel_periodo',
+  SEL_AREA: 'top_sel_area',
+  SEL_CRITERIO: 'top_sel_criterio',
+} as const;
+
 export const STATS_PERIODS = ['semana', 'mes', 'total'] as const;
 export type StatsPeriod = (typeof STATS_PERIODS)[number];
+
+export const RANKING_CRITERIOS = [
+  'asistencia',
+  'puntualidad',
+  'horas',
+  'nota',
+] as const;
+export type RankingCriterio = (typeof RANKING_CRITERIOS)[number];
+
+export const PRACTICANTE_AREAS = [
+  'software',
+  'video',
+  'admin',
+  'marketing',
+  'fotografia',
+  'diseno',
+] as const;
+export type PracticanteArea = (typeof PRACTICANTE_AREAS)[number];
+
+export const AREA_LABELS: Record<string, string> = {
+  software: 'Software',
+  video: 'Video',
+  admin: 'Administración',
+  marketing: 'Marketing',
+  fotografia: 'Fotografía',
+  diseno: 'Diseño',
+};
+
+export const TOP_EMBED_COLOR = 0xf1c40f;
+export const RANKING_DEFAULT_LIMIT = 10;
+export const RANKING_MIN_LIMIT = 3;
+export const RANKING_MAX_LIMIT = 25;
+export const RANKING_API_MAX_LIMIT = 100;
+export const TOP_BUTTON_TTL_MS = 5 * 60_000;
+export const TOP_RATE_LIMIT_MS = 30_000;
 
 export const HOURS_PER_LEVEL = 100;
 export const BOT_VERSION = '2.1.0';

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addDays,
   computeHoursDifference,
   eachDateInclusive,
   formatDurationHours,
@@ -7,6 +8,7 @@ import {
   getCalendarMonthRange,
   getCurrentWeekRange,
   getMonthRange,
+  getPreviousCalendarMonthRange,
   getWeekdayNumber,
 } from './date';
 
@@ -113,6 +115,19 @@ describe('getCalendarMonthRange', () => {
   it('devuelve el mes calendario completo', () => {
     const midMonth = new Date('2026-08-20T18:00:00Z');
     expect(getCalendarMonthRange('America/Lima', midMonth)).toEqual({
+      startDate: '2026-08-01',
+      endDate: '2026-08-31',
+    });
+  });
+});
+
+describe('addDays y mes anterior', () => {
+  it('resta una semana', () => {
+    expect(addDays('2026-08-31', -7)).toBe('2026-08-24');
+  });
+
+  it('calcula agosto desde septiembre', () => {
+    expect(getPreviousCalendarMonthRange('2026-09-01')).toEqual({
       startDate: '2026-08-01',
       endDate: '2026-08-31',
     });

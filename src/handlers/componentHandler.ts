@@ -9,6 +9,7 @@ import {
   STATS_CUSTOM_IDS,
   STATUS_CUSTOM_IDS,
   StatsPeriod,
+  TOP_CUSTOM_IDS,
 } from '../config/constants';
 import {
   buildErrorEmbed,
@@ -26,6 +27,18 @@ import {
   buildEstadoChangeRow,
   buildStatusEmbed,
 } from '../embeds/status.embeds';
+import {
+  buildTopAreaSelect,
+  buildTopButtons,
+  buildTopCriterioSelect,
+  buildTopPeriodSelect,
+} from '../embeds/top.embeds';
+import {
+  getTopSession,
+  replyTopMessage,
+  saveTopSession,
+} from '../commands/top';
+import { isRankingCriterio, isStatsPeriod } from '../services/rankingService';
 import { BotEstadoNombre } from '../services/botStateService';
 import { CommandContext } from '../types/command.type';
 import { getTodayDate } from '../utils/date';
@@ -350,5 +363,149 @@ export async function handleStatusSelect(
     });
   }
 
+  return true;
+}
+
+function topExpiredReply() {
+  return buildErrorEmbed(
+    'Los botones del ranking expiraron. Vuelve a usar `/top`.',
+  );
+}
+
+async function requireTopSession(
+  interaction: ButtonInteraction | StringSelectMenuInteraction,
+) {
+  const session = getTopSession(interaction.message.id);
+  if (!session) {
+    await interaction.reply({
+      embeds: [topExpiredReply()],
+      flags: MessageFlags.Ephemeral,
+    });
+    return null;
+  }
+  if (session.ownerId !== interaction.user.id) {
+    await interaction.reply({
+      embeds: [
+        buildErrorEmbed(
+          'Solo quien ejecutó `/top` puede usar estos botones.',
+        ),
+      ],
+      flags: MessageFlags.Ephemeral,
+    });
+    return null;
+  }
+  return session;
+}
+
+export async function handleTopButton(
+  interaction: ButtonInteraction,
+  context: CommandContext,
+): Promise<boolean> {
+  const { customId } = interaction;
+  if (
+    customId !== TOP_CUSTOM_IDS.PERIODO &&
+    customId !== TOP_CUSTOM_IDS.AREA &&
+    customId !== TOP_CUSTOM_IDS.CRITERIO &&
+    customId !== TOP_CUSTOM_IDS.DETALLE
+  ) {
+    return false;
+  }
+
+  const session = await requireTopSession(interaction);
+  if (!session) return true;
+
+  if (customId === TOP_CUSTOM_IDS.DETALLE) {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    try {
+      const resumen = await context.statsService.getResumen(
+        interaction.user.id,
+        session.periodo,
+      );
+      if (!resumen) {
+        await interaction.editReply({
+          embeds: [
+            buildErrorEmbed(
+              'No estás registrado como practicante. Solicita tu registro a tu encargado.',
+            ),
+          ],
+        });
+        return true;
+      }
+      const memberName =
+        interaction.member && 'displayName' in interaction.member
+          ? String(interaction.member.displayName)
+          : null;
+      await interaction.editReply({
+        embeds: [
+          buildStatsEmbed(statsTargetFromUser(interaction.user, memberName), resumen),
+        ],
+      });
+    } catch (error) {
+      logger.error('Error en detalle de /top:', error);
+      await interaction.editReply({
+        embeds: [buildGenericErrorEmbed()],
+      });
+    }
+    return true;
+  }
+
+  await interaction.update({
+    components: [
+      customId === TOP_CUSTOM_IDS.PERIODO
+        ? buildTopPeriodSelect(session.periodo)
+        : customId === TOP_CUSTOM_IDS.AREA
+          ? buildTopAreaSelect(session.area)
+          : buildTopCriterioSelect(session.criterio),
+      buildTopButtons(),
+    ],
+  });
+  return true;
+}
+
+export async function handleTopSelect(
+  interaction: StringSelectMenuInteraction,
+  context: CommandContext,
+): Promise<boolean> {
+  const { customId } = interaction;
+  if (
+    customId !== TOP_CUSTOM_IDS.SEL_PERIODO &&
+    customId !== TOP_CUSTOM_IDS.SEL_AREA &&
+    customId !== TOP_CUSTOM_IDS.SEL_CRITERIO
+  ) {
+    return false;
+  }
+
+  const session = await requireTopSession(interaction);
+  if (!session) return true;
+
+  const value = interaction.values[0];
+  if (customId === TOP_CUSTOM_IDS.SEL_PERIODO && isStatsPeriod(value)) {
+    session.periodo = value;
+  }
+  if (customId === TOP_CUSTOM_IDS.SEL_AREA) {
+    session.area = value === 'todas' ? null : value;
+  }
+  if (customId === TOP_CUSTOM_IDS.SEL_CRITERIO && isRankingCriterio(value)) {
+    session.criterio = value;
+  }
+
+  await interaction.deferUpdate();
+  try {
+    const view = await replyTopMessage(context, session);
+    await interaction.editReply({
+      embeds: [view.embed],
+      components: view.components,
+    });
+    saveTopSession(interaction.message.id, session);
+  } catch (error) {
+    logger.error('Error al actualizar /top:', error);
+    await interaction.editReply({
+      embeds: [
+        buildErrorEmbed(
+          'No pude armar el ranking ahora. Intenta en unos minutos.',
+        ),
+      ],
+    });
+  }
   return true;
 }

@@ -6,7 +6,13 @@ import {
   ServerResponse,
 } from 'node:http';
 import { Client } from 'discord.js';
-import { BOT_VERSION, StatsPeriod } from '../config/constants';
+import {
+  BOT_VERSION,
+  PRACTICANTE_AREAS,
+  RANKING_API_MAX_LIMIT,
+  RANKING_MIN_LIMIT,
+  StatsPeriod,
+} from '../config/constants';
 import {
   BotEstado,
   BotEstadoHistorial,
@@ -15,6 +21,12 @@ import {
 } from '../services/botStateService';
 import { ConfigService } from '../services/configService';
 import { ErpReadService } from '../services/erpReadService';
+import {
+  RankingResult,
+  RankingService,
+  isRankingCriterio,
+  isStatsPeriod,
+} from '../services/rankingService';
 import { StatsResumen, StatsService } from '../services/statsService';
 import { logger } from '../utils/logger';
 
@@ -26,6 +38,7 @@ export interface BotApiServerOptions {
   client: Client;
   botStateService: BotStateService;
   statsService: StatsService;
+  rankingService: RankingService;
   configService: ConfigService;
   erpReadService: ErpReadService;
   startedAt: number;
@@ -42,7 +55,7 @@ function sendJson(
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers':
       'Content-Type, Authorization, x-api-key, Idempotency-Key',
-    'Access-Control-Allow-Methods': 'GET, PUT, POST, PATCH, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, PUT, POST, PATCH, DELETE, OPTIONS',
   });
   res.end(payload);
 }
@@ -177,6 +190,58 @@ function resumenPayload(resumen: StatsResumen) {
   };
 }
 
+function rankingPayload(result: RankingResult) {
+  return {
+    data: {
+      periodo: {
+        tipo: result.periodo,
+        nominal_inicio: result.nominalStart,
+        nominal_fin: result.nominalEnd,
+        efectivo_inicio: result.effectiveStart,
+        efectivo_fin: result.effectiveEnd,
+      },
+      criterio: result.criterio,
+      area: result.area,
+      total_practicantes: result.totalPracticantes,
+      total_calificados: result.totalCalificados,
+      no_calificados: result.noCalificados,
+      dias_minimos_exigidos: result.diasMinimos,
+      ranking: result.rows.map((row) => ({
+        posicion: row.posicion,
+        practicante_id: row.id,
+        nombre: row.nombre,
+        discord_id: row.discordId || null,
+        area: row.area,
+        estado: row.estado,
+        dias_programados: row.summary.programadas,
+        dias_asistidos: row.summary.asistidas,
+        dias_puntuales: row.summary.puntuales,
+        tardanzas: row.summary.tardanzas,
+        faltas: row.summary.faltas,
+        pct_asistencia: row.summary.pctAsistencia,
+        pct_puntualidad: row.summary.pctPuntualidad,
+        pct_horas: row.summary.pctHoras,
+        horas_acumuladas: row.summary.horasAcumuladas,
+        nota: row.summary.nota,
+        posicion_anterior: row.posicionAnterior,
+        movimiento: row.movimiento,
+      })),
+      posicion_solicitada: result.viewer
+        ? {
+            practicante_id: result.viewer.id,
+            posicion: result.viewer.posicion,
+            de: result.totalCalificados,
+            calificado: result.viewer.calificado,
+          }
+        : null,
+    },
+    meta: {
+      calculado_en: result.calculatedAt.toISOString(),
+      cache_ttl_segundos: result.cacheTtlSeconds,
+    },
+  };
+}
+
 async function parseEstadoBody(
   req: IncomingMessage,
 ): Promise<Record<string, unknown>> {
@@ -192,6 +257,7 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
     client,
     botStateService,
     statsService,
+    rankingService,
     configService,
     erpReadService,
     startedAt,
@@ -448,6 +514,7 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
               config: 'GET|PUT /api/v1/config',
               practicantes: 'GET /api/v1/practicantes',
               resumen: 'GET /api/v1/practicantes/{id}/resumen?periodo=mes',
+              ranking: 'GET /api/v1/reportes/ranking',
               jornadas: 'GET /api/v1/jornadas?practicante_id&desde&hasta',
             },
           },
@@ -536,6 +603,146 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
         }
         sendJson(res, 200, resumenPayload(resumen));
         return;
+      }
+
+      if (method === 'GET' && path === '/api/v1/reportes/ranking') {
+        const periodoRaw = url.searchParams.get('periodo') ?? 'mes';
+        const criterioRaw = url.searchParams.get('criterio') ?? 'asistencia';
+        if (!isStatsPeriod(periodoRaw) || !isRankingCriterio(criterioRaw)) {
+          sendJson(res, 400, {
+            error: { code: 400, message: 'periodo o criterio inválido.' },
+          });
+          return;
+        }
+        const areaRaw = url.searchParams.get('area');
+        if (areaRaw && !(PRACTICANTE_AREAS as readonly string[]).includes(areaRaw)) {
+          sendJson(res, 404, {
+            error: {
+              code: 404,
+              message: `Área inexistente: ${areaRaw}.`,
+            },
+          });
+          return;
+        }
+        if (url.searchParams.get('area_id') && !areaRaw) {
+          sendJson(res, 400, {
+            error: {
+              code: 400,
+              message: 'Usa el parámetro area (software, video, admin, marketing, fotografia, diseno).',
+            },
+          });
+          return;
+        }
+        const limite = Number(url.searchParams.get('limite') ?? 10);
+        if (
+          !Number.isInteger(limite) ||
+          limite < RANKING_MIN_LIMIT ||
+          limite > RANKING_API_MAX_LIMIT
+        ) {
+          sendJson(res, 400, {
+            error: { code: 400, message: 'limite debe estar entre 3 y 100.' },
+          });
+          return;
+        }
+        const practicanteId = url.searchParams.get('practicante_id');
+        const incluir =
+          url.searchParams.get('incluir_cesados') === '1' ||
+          url.searchParams.get('incluir_cesados') === 'true';
+        const result = await rankingService.getRanking({
+          periodo: periodoRaw,
+          area: areaRaw ?? null,
+          criterio: criterioRaw,
+          limite,
+          incluirCesados: incluir || undefined,
+          practicanteId: practicanteId ? Number(practicanteId) : undefined,
+          fechaReferencia: url.searchParams.get('fecha_referencia') ?? undefined,
+        });
+        sendJson(res, 200, rankingPayload(result));
+        return;
+      }
+
+      if (method === 'GET' && path === '/api/v1/reportes/ranking/snapshots') {
+        const rows = await rankingService.listSnapshots({
+          periodo: url.searchParams.get('periodo') ?? undefined,
+          desde: url.searchParams.get('desde') ?? undefined,
+          hasta: url.searchParams.get('hasta') ?? undefined,
+          area: url.searchParams.get('area') ?? undefined,
+        });
+        sendJson(res, 200, { data: rows });
+        return;
+      }
+
+      const snapshotMatch = path.match(
+        /^\/api\/v1\/reportes\/ranking\/snapshots(?:\/(\d+))?$/,
+      );
+      if (snapshotMatch) {
+        const snapshotId = snapshotMatch[1]
+          ? Number(snapshotMatch[1])
+          : null;
+        if (method === 'GET' && snapshotId) {
+          const row = await rankingService.getSnapshotById(snapshotId);
+          if (!row) {
+            sendJson(res, 404, {
+              error: { code: 404, message: 'Snapshot no encontrado.' },
+            });
+            return;
+          }
+          sendJson(res, 200, { data: row });
+          return;
+        }
+        if (method === 'POST' && !snapshotId) {
+          const body = (await parseEstadoBody(req).catch(
+            () => ({}),
+          )) as Record<string, unknown>;
+          const periodoRaw = String(body.periodo ?? 'mes');
+          const criterioRaw = String(body.criterio ?? 'asistencia');
+          if (!isStatsPeriod(periodoRaw) || !isRankingCriterio(criterioRaw)) {
+            sendJson(res, 400, {
+              error: { code: 400, message: 'periodo o criterio inválido.' },
+            });
+            return;
+          }
+          const generated = await rankingService.generateSnapshot({
+            periodo: periodoRaw,
+            area: typeof body.area === 'string' ? body.area : null,
+            criterio: criterioRaw,
+            limite: RANKING_API_MAX_LIMIT,
+            persistSnapshot: true,
+          });
+          sendJson(res, 200, rankingPayload(generated));
+          return;
+        }
+        if (snapshotId && (method === 'PATCH' || method === 'DELETE')) {
+          if (method === 'DELETE') {
+            const ok = await rankingService.deleteSnapshot(snapshotId);
+            if (!ok) {
+              sendJson(res, 404, {
+                error: { code: 404, message: 'Snapshot no encontrado.' },
+              });
+              return;
+            }
+            sendJson(res, 200, { data: { id: snapshotId, anulado: true } });
+            return;
+          }
+          const body = (await parseEstadoBody(req).catch(
+            () => ({}),
+          )) as Record<string, unknown>;
+          if (body.anulado === false || body.deleted_at === null) {
+            const ok = await rankingService.restoreSnapshot(snapshotId);
+            if (!ok) {
+              sendJson(res, 404, {
+                error: { code: 404, message: 'Snapshot no encontrado.' },
+              });
+              return;
+            }
+            sendJson(res, 200, { data: { id: snapshotId, anulado: false } });
+            return;
+          }
+          sendJson(res, 400, {
+            error: { code: 400, message: 'Nada que actualizar.' },
+          });
+          return;
+        }
       }
 
       sendJson(res, 404, {

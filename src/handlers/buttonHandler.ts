@@ -16,6 +16,8 @@ import {
   handleStatsButton,
   handleStatsSelect,
   handleStatusSelect,
+  handleTopButton,
+  handleTopSelect,
 } from './componentHandler';
 import { CommandContext } from '../types/command.type';
 import { hasStaffRole } from '../utils/roles';
@@ -57,6 +59,7 @@ export function registerButtonHandler(
   client.on(Events.InteractionCreate, async (interaction) => {
     try {
       if (interaction.isStringSelectMenu()) {
+        if (await handleTopSelect(interaction, context)) return;
         if (await handleStatsSelect(interaction, context)) return;
         if (await handleStatusSelect(interaction, context)) return;
         return;
@@ -64,6 +67,7 @@ export function registerButtonHandler(
 
       if (!interaction.isButton()) return;
 
+      if (await handleTopButton(interaction, context)) return;
       if (await handleStatsButton(interaction, context)) return;
 
       const { customId } = interaction;

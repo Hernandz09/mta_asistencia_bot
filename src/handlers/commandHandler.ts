@@ -2,6 +2,7 @@ import { Client, Events, MessageFlags } from 'discord.js';
 import { asistenciaCommand } from '../commands/asistencia';
 import { estadisticasCommand, statsCommand } from '../commands/stats';
 import { statusCommand } from '../commands/status';
+import { topCommand } from '../commands/top';
 import { buildStatusEmbed } from '../embeds/status.embeds';
 import { BotCommand, CommandContext } from '../types/command.type';
 import { getTodayDate } from '../utils/date';
@@ -13,6 +14,7 @@ const commands: BotCommand[] = [
   statsCommand,
   estadisticasCommand,
   statusCommand,
+  topCommand,
 ];
 
 const commandsByName = new Map(

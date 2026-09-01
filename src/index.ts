@@ -13,6 +13,7 @@ import { ScheduleService } from './services/scheduleService';
 import { SheetsService } from './services/sheetsService';
 import { ConfigService } from './services/configService';
 import { ErpReadService } from './services/erpReadService';
+import { RankingService } from './services/rankingService';
 import { StatsService } from './services/statsService';
 import { CommandContext } from './types/command.type';
 import { logger } from './utils/logger';
@@ -35,7 +36,13 @@ async function main(): Promise<void> {
   );
   const configService = new ConfigService(pool);
   const erpReadService = new ErpReadService(pool);
-  const statsService = new StatsService(pool, config.timezone, configService);
+  const rankingService = new RankingService(pool, config.timezone, configService);
+  const statsService = new StatsService(
+    pool,
+    config.timezone,
+    configService,
+    rankingService,
+  );
   const botStateService = new BotStateService(pool);
 
   const client = new Client({
@@ -46,6 +53,7 @@ async function main(): Promise<void> {
     attendanceService,
     scheduleService,
     statsService,
+    rankingService,
     botStateService,
     adminRoleId: config.discord.adminRoleId,
     attendanceChannelId: config.discord.attendanceChannelId,
@@ -57,6 +65,7 @@ async function main(): Promise<void> {
     attendanceService,
     scheduleService,
     botStateService,
+    rankingService,
     config,
   );
   registerCommandHandler(client, commandContext);
@@ -72,6 +81,7 @@ async function main(): Promise<void> {
     client,
     botStateService,
     statsService,
+    rankingService,
     configService,
     erpReadService,
     startedAt: Date.now(),

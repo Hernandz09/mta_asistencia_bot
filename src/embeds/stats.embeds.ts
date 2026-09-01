@@ -41,7 +41,11 @@ export function buildStatsEmbed(
 
   const descriptionLines = [
     `⭐  **Nivel:** ${resumen.nivel} (${formatHoursShort(resumen.allTimeHours)}/${resumen.nextLevelHours} h)`,
-    `👑  **Ranking:** #${resumen.ranking} de ${resumen.rankingTotal}`,
+    `👑  **Ranking:** ${
+      resumen.ranking > 0
+        ? `#${resumen.ranking} de ${resumen.rankingTotal}`
+        : `aún no califica (${resumen.rankingTotal} en el área)`
+    }`,
     `📅  Registrado el ${registrado}`,
   ];
 

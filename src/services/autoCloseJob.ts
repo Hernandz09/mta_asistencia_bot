@@ -1,5 +1,6 @@
 import { schedule } from 'node-cron';
 import { AttendanceService } from './attendanceService';
+import { RankingService } from './rankingService';
 import { logger } from '../utils/logger';
 
 /**
@@ -25,4 +26,20 @@ export function scheduleAutoClose(
   logger.info(
     `Cierre automático de asistencias programado (${cronExpression}, ${timezone})`,
   );
+}
+
+export function scheduleRankingSnapshots(
+  rankingService: RankingService,
+  timezone: string,
+): void {
+  schedule(
+    '59 23 * * *',
+    () => {
+      rankingService.snapshotDuePeriods().catch((error) => {
+        logger.error('Error al generar snapshot de ranking:', error);
+      });
+    },
+    { timezone },
+  );
+  logger.info(`Snapshots de ranking programados (23:59, ${timezone})`);
 }
