@@ -12,6 +12,9 @@ env
 docs/sql/002_migracion_datos.sql
 docs/sql/000_importar_hostinger.sql
 
+# Documentación local con API key (no publicar)
+docs/api-completa.html
+
 # Hash local del avatar ya subido a Discord
 .data/
 

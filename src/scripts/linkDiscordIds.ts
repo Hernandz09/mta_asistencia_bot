@@ -14,6 +14,11 @@ const LINKS = [
     apellidos: 'Gonzales',
     discordId: '777320698795655178',
   },
+  {
+    nombres: 'Diego',
+    apellidos: 'Galarza',
+    discordId: '637326275425599511',
+  },
 ] as const;
 
 async function linkDiscordIds(): Promise<void> {
@@ -22,13 +27,16 @@ async function linkDiscordIds(): Promise<void> {
 
   try {
     const ids = LINKS.map((item) => item.discordId);
+    const placeholders = ids.map(() => '?').join(', ');
+    const keepOwners = LINKS.map(
+      () => 'NOT (nombres = ? AND apellidos = ?)',
+    ).join(' AND ');
     await pool.query(
       `UPDATE practicantes
        SET id_externo_bot = NULL
-       WHERE id_externo_bot IN (?, ?)
-         AND NOT (nombres = 'Kevin' AND apellidos = 'Ludeña')
-         AND NOT (nombres = 'Alfredo' AND apellidos = 'Gonzales')`,
-      [...ids],
+       WHERE id_externo_bot IN (${placeholders})
+         AND ${keepOwners}`,
+      [...ids, ...LINKS.flatMap((item) => [item.nombres, item.apellidos])],
     );
 
     for (const link of LINKS) {
