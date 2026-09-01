@@ -68,6 +68,7 @@ export interface StatsResumen {
   effectiveStart: string;
   effectiveEnd: string;
   notaMes: number | null;
+  horasExtra: number;
   detalle: StatsDayDetail[];
 }
 
@@ -368,6 +369,7 @@ export class StatsService {
       effectiveStart: window?.start ?? nominal.startDate,
       effectiveEnd: window?.end ?? nominal.endDate,
       notaMes,
+      horasExtra: extraHours,
       detalle,
     };
   }

@@ -21,6 +21,8 @@ import {
 } from '../services/botStateService';
 import { ConfigService } from '../services/configService';
 import { ErpPracticante, ErpReadService } from '../services/erpReadService';
+import { ExtraHoursService } from '../services/extraHoursService';
+import { handleExtraHoursApi } from './extraHoursApi';
 import {
   RankingResult,
   RankingService,
@@ -43,6 +45,8 @@ export interface BotApiServerOptions {
   rankingService: RankingService;
   configService: ConfigService;
   erpReadService: ErpReadService;
+  extraHoursService?: ExtraHoursService;
+  timezone: string;
   startedAt: number;
 }
 
@@ -170,10 +174,17 @@ function resumenPayload(resumen: StatsResumen) {
       },
       horas: {
         acumuladas: resumen.summary.horasAcumuladas,
+        extra: resumen.horasExtra,
         semana: resumen.horasSemana,
         meta_semana: resumen.metaSemana,
         por_justificar: resumen.summary.horasPorJustificar,
       },
+      detalle: resumen.detalle.map((day) => ({
+        fecha: day.fecha,
+        label: day.label,
+        horas: day.horas,
+        extra: day.label.includes('⚡ Extra'),
+      })),
       indicadores: {
         pct_asistencia: resumen.summary.pctAsistencia,
         pct_puntualidad: resumen.summary.pctPuntualidad,
@@ -294,6 +305,8 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
     rankingService,
     configService,
     erpReadService,
+    extraHoursService,
+    timezone,
     startedAt,
   } = options;
 
@@ -551,12 +564,44 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
               horario: 'GET /api/v1/practicantes/{id}/horario',
               ranking: 'GET /api/v1/reportes/ranking',
               jornadas: 'GET /api/v1/jornadas?practicante_id&desde&hasta',
+              horas_extra:
+                'GET|POST|PUT|DELETE /api/v1/practicantes/{id}/horas-extra',
               marcaciones: 'GET /api/v1/marcaciones?practicante_id&desde&hasta',
               horarios: 'GET /api/v1/horarios?practicante_id=',
             },
           },
         });
         return;
+      }
+
+      if (
+        path === '/api/v1/horas-extra' ||
+        /^\/api\/v1\/practicantes\/\d+\/horas-extra$/.test(path)
+      ) {
+        if (!extraHoursService) {
+          sendJson(res, 503, {
+            error: {
+              code: 503,
+              message: 'Horas extra no disponibles.',
+            },
+          });
+          return;
+        }
+        const handled = await handleExtraHoursApi(
+          method,
+          path,
+          url,
+          req,
+          res,
+          {
+            extraHoursService,
+            statsService,
+            timezone,
+            sendJson,
+            readJson: parseEstadoBody,
+          },
+        );
+        if (handled) return;
       }
 
       if (method === 'GET' && path === '/api/v1/config') {
@@ -607,8 +652,29 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
           page: Number(url.searchParams.get('page') ?? 1),
           perPage: Number(url.searchParams.get('per_page') ?? 50),
         });
+        const extras = extraHoursService
+          ? await extraHoursService.findForDays(
+              result.rows.map((row) => ({
+                practicanteId: row.practicanteId,
+                fecha: row.fecha,
+              })),
+            )
+          : [];
+        const extraByDay = new Map(
+          extras.map((row) => [
+            `${row.practicanteId ?? ''}:${row.fecha}`,
+            row,
+          ]),
+        );
         sendJson(res, 200, {
-          data: result.rows,
+          data: result.rows.map((row) => {
+            const extra = extraByDay.get(`${row.practicanteId}:${row.fecha}`);
+            return {
+              ...row,
+              horasExtra: extra?.horas ?? 0,
+              extraMotivo: extra?.motivo ?? null,
+            };
+          }),
           meta: {
             page: result.page,
             per_page: result.perPage,

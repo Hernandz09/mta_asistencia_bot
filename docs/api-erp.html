@@ -118,7 +118,7 @@
 <nav>
   <div class="brand">MTA Software</div>
   <h1>API del Bot para el ERP</h1>
-  <div class="ver">v2.2 · ESPEC-ASIS-001 a 004</div>
+  <div class="ver">v2.3 · ESPEC-ASIS-001 a 004</div>
   <input id="q" type="search" placeholder="Filtrar endpoints…" />
 
   <div class="sec">Inicio</div>
@@ -145,6 +145,8 @@
   <a href="#e-resumen"><span class="m m-get">GET</span> /resumen</a>
   <a href="#e-horario"><span class="m m-get">GET</span> /horario</a>
   <a href="#e-jornadas"><span class="m m-get">GET</span> /jornadas</a>
+  <a href="#e-extras"><span class="m m-get">GET</span> /horas-extra</a>
+  <a href="#e-extras-write"><span class="m m-post">POST</span> /horas-extra</a>
   <a href="#e-marcaciones"><span class="m m-get">GET</span> /marcaciones</a>
   <a href="#e-ranking"><span class="m m-get">GET</span> /ranking</a>
   <a href="#e-snap-list"><span class="m m-get">GET</span> /snapshots</a>
@@ -175,7 +177,7 @@
       <tr><th>Formato</th><td>JSON UTF-8 · <code>Content-Type: application/json</code></td></tr>
       <tr><th>CORS</th><td>Abierto (<code>Access-Control-Allow-Origin: *</code>). Preflight <code>OPTIONS</code> → 204.</td></tr>
       <tr><th>Zona horaria de negocio</th><td><code>America/Lima</code> (fechas de jornada en calendario local)</td></tr>
-      <tr><th>Versión del bot</th><td><code>2.2.0</code> (campo <code>version</code> en health / estado)</td></tr>
+      <tr><th>Versión del bot</th><td><code>2.3.0</code> (campo <code>version</code> en health / estado)</td></tr>
     </table>
   </div>
 
@@ -387,7 +389,7 @@ Authorization: Bearer TU_BOT_API_KEY</pre>
     "status": "ok",
     "discord": "OK",
     "base_datos": "OK",
-    "version": "2.2.0",
+    "version": "2.3.0",
     "uptime_segundos": 3600
   }
 }</pre>
@@ -405,7 +407,7 @@ Authorization: Bearer TU_BOT_API_KEY</pre>
     "estado": "ACTIVO",
     "mensaje": null,
     "programado_hasta": null,
-    "version": "2.2.0",
+    "version": "2.3.0",
     "uptime_segundos": 120,
     "latencia_ms": 42,
     "conexiones": { "base_datos": "OK", "api_erp": "OK", "discord": "OK" },
@@ -565,7 +567,11 @@ Authorization: Bearer TU_BOT_API_KEY</pre>
       "puntuales": 11, "tardanzas": 0, "faltas": 0,
       "programadas": 11, "asistidas": 11, "pendientes": 0
     },
-    "horas": { "acumuladas": 66, "semana": 30, "meta_semana": 30, "por_justificar": 0 },
+    "horas": { "acumuladas": 68, "extra": 2, "semana": 32, "meta_semana": 30, "por_justificar": 0 },
+    "detalle": [
+      { "fecha": "2026-08-31", "label": "31/08/2026  ✅ Puntual  ·  6 h", "horas": 6, "extra": false },
+      { "fecha": "2026-08-31", "label": "31/08/2026  ⚡ Extra  ·  2 h (reunión)", "horas": 2, "extra": true }
+    ],
     "indicadores": {
       "pct_asistencia": 100, "pct_puntualidad": 100, "pct_horas": 100,
       "nota": 20, "nota_mes": null
@@ -601,11 +607,49 @@ Authorization: Bearer TU_BOT_API_KEY</pre>
     "estadoJornada": "CERRADA",
     "horasComputadas": 6,
     "horasJustificadas": 0,
-    "horasPorJustificar": 0
+    "horasPorJustificar": 0,
+    "horasExtra": 2,
+    "extraMotivo": "reunión"
   }],
   "meta": { "page": 1, "per_page": 50, "total": 6 }
 }</pre>
-      <p class="note"><code>horaEntrada</code> es <code>null</code> si <code>SIN_MARCA</code>. <code>horaSalida</code> es <code>null</code> si <code>SIN_SALIDA</code> (jornada abierta).</p>
+      <p class="note"><code>horaEntrada</code> es <code>null</code> si <code>SIN_MARCA</code>. <code>horaSalida</code> es <code>null</code> si <code>SIN_SALIDA</code> (jornada abierta). <code>horasExtra</code> es adicional: no cambia <code>estadoEntrada</code> ni <code>estadoJornada</code>.</p>
+    </div>
+  </article>
+
+  <article class="endpoint" id="e-extras">
+    <div class="head"><span class="badge auth">API key</span><span class="m m-get">GET</span><span class="path">/api/v1/practicantes/{id}/horas-extra</span> <span class="muted">alias GET /horas-extra?practicante_id=</span></div>
+    <div class="body">
+      <p>Lista extras de un practicante. No reemplazan puntual / tardanza / falta. Query opcional: <code>desde</code>, <code>hasta</code>.</p>
+<pre><button class="copy" type="button">Copiar</button>curl -s -H "x-api-key: $BOT_API_KEY" \
+  "https://mtaasistenciabot-production.up.railway.app/api/v1/practicantes/9/horas-extra?desde=2026-08-01&amp;hasta=2026-09-01"</pre>
+<pre>{
+  "data": [
+    { "id": 12, "practicante_id": 9, "fecha": "2026-08-31", "horas": 2, "motivo": "quedó a terminar" }
+  ]
+}</pre>
+    </div>
+  </article>
+
+  <article class="endpoint" id="e-extras-write">
+    <div class="head"><span class="badge auth">API key</span><span class="m m-post">POST</span> <span class="m m-put">PUT</span> <span class="m m-del">DEL</span><span class="path">/api/v1/practicantes/{id}/horas-extra</span></div>
+    <div class="body">
+      <p><strong>POST</strong> suma extra a ese día (como <code>/horas add</code>). <strong>PUT</strong> reemplaza (como <code>/horas actualizar</code>). <strong>DELETE</strong> quita solo el extra (<code>?fecha=</code>). Tope 12 h extra por día. La jornada no se toca.</p>
+      <table>
+        <tr><th>fecha</th><td>obligatoria · <code>YYYY-MM-DD</code>, <code>31/08/2026</code> o <code>hoy</code></td></tr>
+        <tr><th>horas</th><td>número <code>2.5</code> o texto <code>2h 30m</code></td></tr>
+        <tr><th>tiempo</th><td>alternativa a <code>horas</code></td></tr>
+        <tr><th>motivo</th><td>opcional, sale en detalle</td></tr>
+        <tr><th>modo</th><td>en POST: <code>add</code> (default) o <code>set</code></td></tr>
+      </table>
+<pre><button class="copy" type="button">Copiar</button>curl -s -X POST -H "x-api-key: $BOT_API_KEY" -H "Content-Type: application/json" \
+  -d "{\"fecha\":\"2026-08-31\",\"horas\":2,\"motivo\":\"quedó a terminar\"}" \
+  "https://mtaasistenciabot-production.up.railway.app/api/v1/practicantes/9/horas-extra"</pre>
+<pre><button class="copy" type="button">Copiar</button>curl -s -X PUT -H "x-api-key: $BOT_API_KEY" -H "Content-Type: application/json" \
+  -d "{\"fecha\":\"2026-08-31\",\"tiempo\":\"1h 30m\",\"motivo\":\"corrección\"}" \
+  "https://mtaasistenciabot-production.up.railway.app/api/v1/practicantes/9/horas-extra"</pre>
+<pre><button class="copy" type="button">Copiar</button>curl -s -X DELETE -H "x-api-key: $BOT_API_KEY" \
+  "https://mtaasistenciabot-production.up.railway.app/api/v1/practicantes/9/horas-extra?fecha=2026-08-31"</pre>
     </div>
   </article>
 
@@ -816,8 +860,10 @@ const activos = await botGet("/api/v1/practicantes?estado=activo");
 const kevin = await botGet("/api/v1/practicantes/9/resumen?periodo=mes");
 const top = await botGet("/api/v1/reportes/ranking?periodo=mes&amp;limite=10");
 const dias = await botGet("/api/v1/jornadas?practicante_id=9&amp;desde=2026-08-01&amp;hasta=2026-08-31");
+const extras = await botGet("/api/v1/practicantes/9/horas-extra?desde=2026-08-01&amp;hasta=2026-08-31");
 const horario = await botGet("/api/v1/practicantes/9/horario");
 const marcas = await botGet("/api/v1/marcaciones?practicante_id=9&amp;desde=2026-08-01&amp;hasta=2026-08-31");
+await botSend("POST", "/api/v1/practicantes/9/horas-extra", { fecha: "2026-08-31", horas: 2, motivo: "quedó a terminar" });
 
 // Operación
 await botSend("POST", "/api/v1/bot/estado/activar");

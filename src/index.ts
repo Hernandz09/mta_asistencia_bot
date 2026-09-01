@@ -96,6 +96,8 @@ async function main(): Promise<void> {
     rankingService,
     configService,
     erpReadService,
+    extraHoursService,
+    timezone: config.timezone,
     startedAt: Date.now(),
   });
 

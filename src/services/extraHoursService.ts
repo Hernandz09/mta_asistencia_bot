@@ -5,6 +5,7 @@ export const EXTRA_HOURS_DAY_CAP = 12;
 
 export interface ExtraHoursRow {
   id: number;
+  practicanteId?: number;
   fecha: string;
   horas: number;
   motivo: string | null;
@@ -30,6 +31,8 @@ function asDateString(value: unknown): string {
 function mapRow(row: RowDataPacket): ExtraHoursRow {
   return {
     id: Number(row.id ?? 0),
+    practicanteId:
+      row.practicante_id == null ? undefined : Number(row.practicante_id),
     fecha: asDateString(row.fecha),
     horas: Number(row.horas ?? 0),
     motivo: row.motivo ? String(row.motivo) : null,
@@ -75,7 +78,7 @@ export class ExtraHoursService {
     fecha: string,
   ): Promise<ExtraHoursRow | null> {
     const [rows] = await this.pool.query<RowDataPacket[]>(
-      `SELECT id, fecha, horas, motivo
+      `SELECT id, practicante_id, fecha, horas, motivo
        FROM horas_extra
        WHERE practicante_id = ? AND fecha = ?
        ORDER BY id
@@ -91,6 +94,7 @@ export class ExtraHoursService {
     fecha: string;
     horas: number;
     motivo?: string | null;
+    origen?: string;
     creadoPorDiscord?: string | null;
   }): Promise<ExtraHoursRow> {
     const current = await this.findByDate(params.practicanteId, params.fecha);
@@ -107,6 +111,7 @@ export class ExtraHoursService {
       fecha: params.fecha,
       horas: nextHours,
       motivo,
+      origen: params.origen,
       creadoPorDiscord: params.creadoPorDiscord,
     });
   }
@@ -117,6 +122,7 @@ export class ExtraHoursService {
     fecha: string;
     horas: number;
     motivo?: string | null;
+    origen?: string;
     creadoPorDiscord?: string | null;
   }): Promise<ExtraHoursRow> {
     if (params.horas > EXTRA_HOURS_DAY_CAP) {
@@ -134,6 +140,7 @@ export class ExtraHoursService {
         params.motivo !== undefined
           ? params.motivo?.trim() || null
           : current?.motivo ?? null,
+      origen: params.origen,
       creadoPorDiscord: params.creadoPorDiscord,
     });
   }
@@ -178,11 +185,56 @@ export class ExtraHoursService {
     endDate: string,
   ): Promise<ExtraHoursRow[]> {
     const [rows] = await this.pool.query<RowDataPacket[]>(
-      `SELECT id, fecha, horas, motivo
+      `SELECT id, practicante_id, fecha, horas, motivo
        FROM horas_extra
        WHERE practicante_id = ? AND fecha BETWEEN ? AND ?
        ORDER BY fecha, id`,
       [practicanteId, startDate, endDate],
+    );
+    return rows.map((row) => mapRow(row));
+  }
+
+  async listInRange(filters: {
+    practicanteId?: number;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<ExtraHoursRow[]> {
+    const where: string[] = [];
+    const values: Array<string | number> = [];
+    if (filters.practicanteId) {
+      where.push('practicante_id = ?');
+      values.push(filters.practicanteId);
+    }
+    if (filters.startDate) {
+      where.push('fecha >= ?');
+      values.push(filters.startDate);
+    }
+    if (filters.endDate) {
+      where.push('fecha <= ?');
+      values.push(filters.endDate);
+    }
+    const sqlWhere = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      `SELECT id, practicante_id, fecha, horas, motivo
+       FROM horas_extra
+       ${sqlWhere}
+       ORDER BY fecha, id`,
+      values,
+    );
+    return rows.map((row) => mapRow(row));
+  }
+
+  async findForDays(
+    days: Array<{ practicanteId: number; fecha: string }>,
+  ): Promise<ExtraHoursRow[]> {
+    if (days.length === 0) return [];
+    const tuples = days.map(() => '(?, ?)').join(', ');
+    const values = days.flatMap((day) => [day.practicanteId, day.fecha]);
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      `SELECT id, practicante_id, fecha, horas, motivo
+       FROM horas_extra
+       WHERE (practicante_id, fecha) IN (${tuples})`,
+      values,
     );
     return rows.map((row) => mapRow(row));
   }
@@ -192,6 +244,7 @@ export class ExtraHoursService {
     fecha: string;
     horas: number;
     motivo?: string | null;
+    origen?: string;
     creadoPorDiscord?: string | null;
   }): Promise<ExtraHoursRow> {
     const conn = await this.pool.getConnection();
@@ -204,12 +257,13 @@ export class ExtraHoursService {
       await conn.query<ResultSetHeader>(
         `INSERT INTO horas_extra
            (practicante_id, fecha, horas, motivo, origen, creado_por_discord)
-         VALUES (?, ?, ?, ?, 'bot', ?)`,
+         VALUES (?, ?, ?, ?, ?, ?)`,
         [
           params.practicanteId,
           params.fecha,
           params.horas,
           params.motivo ?? null,
+          params.origen?.trim() || 'bot',
           params.creadoPorDiscord ?? null,
         ],
       );
