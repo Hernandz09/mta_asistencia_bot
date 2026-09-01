@@ -13,6 +13,8 @@ import {
   BotEstadoNombre,
   BotStateService,
 } from '../services/botStateService';
+import { ConfigService } from '../services/configService';
+import { ErpReadService } from '../services/erpReadService';
 import { StatsResumen, StatsService } from '../services/statsService';
 import { logger } from '../utils/logger';
 
@@ -24,6 +26,8 @@ export interface BotApiServerOptions {
   client: Client;
   botStateService: BotStateService;
   statsService: StatsService;
+  configService: ConfigService;
+  erpReadService: ErpReadService;
   startedAt: number;
 }
 
@@ -38,7 +42,7 @@ function sendJson(
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers':
       'Content-Type, Authorization, x-api-key, Idempotency-Key',
-    'Access-Control-Allow-Methods': 'GET, PUT, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, PUT, POST, PATCH, OPTIONS',
   });
   res.end(payload);
 }
@@ -176,8 +180,16 @@ async function parseEstadoBody(
 }
 
 export function startBotApiServer(options: BotApiServerOptions): Server {
-  const { port, apiKey, client, botStateService, statsService, startedAt } =
-    options;
+  const {
+    port,
+    apiKey,
+    client,
+    botStateService,
+    statsService,
+    configService,
+    erpReadService,
+    startedAt,
+  } = options;
 
   const server = createServer(async (req, res) => {
     try {
@@ -393,6 +405,82 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
         });
         sendJson(res, 200, {
           data: result.rows.map(historialPayload),
+          meta: {
+            page: result.page,
+            per_page: result.perPage,
+            total: result.total,
+          },
+        });
+        return;
+      }
+
+      if (method === 'GET' && (path === '/api/v1' || path === '/api')) {
+        sendJson(res, 200, {
+          data: {
+            nombre: 'Bot de Asistencias MTA',
+            version: BOT_VERSION,
+            modelo: 'El bot es independiente. El ERP solo consume esta API.',
+            endpoints: {
+              health: 'GET /api/v1/bot/health',
+              estado: 'GET|PUT /api/v1/bot/estado',
+              config: 'GET|PUT /api/v1/config',
+              practicantes: 'GET /api/v1/practicantes',
+              resumen: 'GET /api/v1/practicantes/{id}/resumen?periodo=mes',
+              jornadas: 'GET /api/v1/jornadas?practicante_id&desde&hasta',
+            },
+          },
+        });
+        return;
+      }
+
+      if (method === 'GET' && path === '/api/v1/config') {
+        sendJson(res, 200, { data: await configService.list() });
+        return;
+      }
+
+      if (method === 'PUT' && path === '/api/v1/config') {
+        const body = await parseEstadoBody(req);
+        const raw =
+          body.variables && typeof body.variables === 'object'
+            ? (body.variables as Record<string, unknown>)
+            : body;
+        const variables: Record<string, string> = {};
+        for (const [clave, valor] of Object.entries(raw)) {
+          if (clave === 'variables') continue;
+          variables[clave] = String(valor);
+        }
+        const result = await configService.update(variables);
+        if (result.errors.length > 0) {
+          sendJson(res, 422, {
+            error: { code: 422, message: result.errors.join(' ') },
+            data: result.updated,
+          });
+          return;
+        }
+        sendJson(res, 200, { data: result.updated });
+        return;
+      }
+
+      if (method === 'GET' && path === '/api/v1/practicantes') {
+        const list = await erpReadService.listPracticantes({
+          estado: url.searchParams.get('estado') ?? undefined,
+          area: url.searchParams.get('area') ?? undefined,
+        });
+        sendJson(res, 200, { data: list });
+        return;
+      }
+
+      if (method === 'GET' && path === '/api/v1/jornadas') {
+        const practicanteId = url.searchParams.get('practicante_id');
+        const result = await erpReadService.listJornadas({
+          practicanteId: practicanteId ? Number(practicanteId) : undefined,
+          desde: url.searchParams.get('desde') ?? undefined,
+          hasta: url.searchParams.get('hasta') ?? undefined,
+          page: Number(url.searchParams.get('page') ?? 1),
+          perPage: Number(url.searchParams.get('per_page') ?? 50),
+        });
+        sendJson(res, 200, {
+          data: result.rows,
           meta: {
             page: result.page,
             per_page: result.perPage,

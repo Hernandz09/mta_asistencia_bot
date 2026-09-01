@@ -18,6 +18,7 @@ import {
   monthLabelEs,
   summarizePeriod,
 } from './statsMath';
+import { ConfigService } from './configService';
 
 const CACHE_TTL_MS = 60_000;
 
@@ -101,6 +102,7 @@ export class StatsService {
   constructor(
     private readonly pool: Pool,
     private readonly timezone: string,
+    private readonly configService?: ConfigService,
   ) {}
 
   async findPracticanteByDiscord(
@@ -195,13 +197,23 @@ export class StatsService {
       ]);
 
     const dates = eachDateInclusive(range.startDate, range.endDate);
+    const weights = this.configService
+      ? await this.configService.getNoteWeights()
+      : undefined;
+    const hoursPerLevel = this.configService
+      ? await this.configService.getHoursPerLevel()
+      : undefined;
     const summary = summarizePeriod(
       dates,
       jornadas,
       horario.dias,
       horario.refrigerioMin,
+      weights,
     );
-    const { nivel, nextLevelHours } = computeLevel(allTimeHours);
+    const { nivel, nextLevelHours } = computeLevel(
+      allTimeHours,
+      hoursPerLevel,
+    );
     const ranking = await this.computeRanking(
       practicante,
       range.startDate,
@@ -402,6 +414,9 @@ export class StatsService {
       }
 
       const dates = eachDateInclusive(startDate, endDate);
+      const weights = this.configService
+        ? await this.configService.getNoteWeights()
+        : undefined;
       const scores = peerIds.map((id) => {
         const horario = horarioByPeer.get(id) ?? {
           dias: [],
@@ -413,6 +428,7 @@ export class StatsService {
           byPracticante.get(id) ?? [],
           horario.dias,
           horario.refrigerioMin,
+          weights,
         );
         return { id, nota: summary.nota };
       });

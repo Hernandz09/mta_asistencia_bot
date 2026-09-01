@@ -11,6 +11,8 @@ import { createMysqlPool } from './services/mysqlClient';
 import { MysqlHorariosRepository } from './services/mysqlHorariosRepository';
 import { ScheduleService } from './services/scheduleService';
 import { SheetsService } from './services/sheetsService';
+import { ConfigService } from './services/configService';
+import { ErpReadService } from './services/erpReadService';
 import { StatsService } from './services/statsService';
 import { CommandContext } from './types/command.type';
 import { logger } from './utils/logger';
@@ -31,7 +33,9 @@ async function main(): Promise<void> {
     pool,
     sheetsService,
   );
-  const statsService = new StatsService(pool, config.timezone);
+  const configService = new ConfigService(pool);
+  const erpReadService = new ErpReadService(pool);
+  const statsService = new StatsService(pool, config.timezone, configService);
   const botStateService = new BotStateService(pool);
 
   const client = new Client({
@@ -67,6 +71,8 @@ async function main(): Promise<void> {
     client,
     botStateService,
     statsService,
+    configService,
+    erpReadService,
     startedAt: Date.now(),
   });
 

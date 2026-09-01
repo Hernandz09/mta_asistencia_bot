@@ -15,6 +15,7 @@
     "db:migrate": "tsx src/scripts/migrateSheetsToMysql.ts",
     "db:link-discord": "tsx src/scripts/linkDiscordIds.ts",
     "db:dump": "tsx src/scripts/dumpSheetsToSql.ts",
+    "env:railway": "tsx src/scripts/buildRailwayEnv.ts",
     "test": "vitest run"
   },
   "keywords": [

@@ -56,11 +56,12 @@ export function computeNota(
   pctAsistencia: number,
   pctPuntualidad: number,
   pctHoras: number,
+  weights: { asistencia: number; puntualidad: number; horas: number } = NOTE_WEIGHTS,
 ): number {
   const weighted =
-    NOTE_WEIGHTS.asistencia * pctAsistencia +
-    NOTE_WEIGHTS.puntualidad * pctPuntualidad +
-    NOTE_WEIGHTS.horas * pctHoras;
+    weights.asistencia * pctAsistencia +
+    weights.puntualidad * pctPuntualidad +
+    weights.horas * pctHoras;
   return round1((weighted / 100) * 20);
 }
 
@@ -78,13 +79,17 @@ export function notaColor(nota: number): number {
   return NOTE_COLORS.DEFICIENTE;
 }
 
-export function computeLevel(allTimeHours: number): {
+export function computeLevel(
+  allTimeHours: number,
+  hoursPerLevel: number = HOURS_PER_LEVEL,
+): {
   nivel: number;
   nextLevelHours: number;
 } {
+  const step = hoursPerLevel > 0 ? hoursPerLevel : HOURS_PER_LEVEL;
   const hours = Math.max(0, allTimeHours);
-  const nivel = Math.floor(hours / HOURS_PER_LEVEL) + 1;
-  return { nivel, nextLevelHours: nivel * HOURS_PER_LEVEL };
+  const nivel = Math.floor(hours / step) + 1;
+  return { nivel, nextLevelHours: nivel * step };
 }
 
 export function formatHoursShort(hours: number): string {
@@ -177,6 +182,7 @@ export function summarizePeriod(
   jornadas: JornadaStatsRow[],
   dias: HorarioDiaStats[],
   refrigerioMin: number,
+  weights: { asistencia: number; puntualidad: number; horas: number } = NOTE_WEIGHTS,
 ): PeriodSummary {
   const byDate = new Map(jornadas.map((row) => [row.fecha, row]));
   let programadas = 0;
@@ -231,7 +237,7 @@ export function summarizePeriod(
     pctAsistencia,
     pctPuntualidad,
     pctHoras,
-    nota: computeNota(pctAsistencia, pctPuntualidad, pctHoras),
+    nota: computeNota(pctAsistencia, pctPuntualidad, pctHoras, weights),
     sinRegistros: jornadas.length === 0,
   };
 }
