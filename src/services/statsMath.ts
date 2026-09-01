@@ -390,8 +390,8 @@ function detalleLine(row: JornadaStatsRow): string {
 }
 
 /**
- * Desglose día a día del periodo, alineado con el resumen.
- * Incluye faltas de días laborables sin jornada (no solo filas guardadas).
+ * Desglose día a día del periodo: cada día del horario, con puntual,
+ * tardanza, falta o pendiente. No se limita a filas ya guardadas.
  */
 export function buildPeriodDetalle(
   dates: string[],
@@ -411,14 +411,25 @@ export function buildPeriodDetalle(
 
     const jornada = byDate.get(date);
     if (feriados.has(date) || !isLaborableDate(date, dias, jornada)) continue;
-    if (date > context.today) continue;
+    if (['NO_LABORABLE', 'VACACIONES', 'LICENCIA'].includes(jornada?.estadoJornada ?? '')) {
+      continue;
+    }
 
     const pendingToday =
       date === context.today &&
       !context.contarDiaEnCurso &&
       !(jornada && isAsistida(jornada)) &&
       isEntryWindowOpen(date, dias, context.nowMinutes, tolerancia);
-    if (pendingToday) continue;
+    const isPending = date > context.today || pendingToday;
+
+    if (isPending) {
+      items.push({
+        fecha: date,
+        label: `${formatDateEs(date)}  ⏳ Pendiente  ·  0 h`,
+        horas: 0,
+      });
+      continue;
+    }
 
     const row: JornadaStatsRow = jornada ?? {
       fecha: date,
@@ -428,9 +439,6 @@ export function buildPeriodDetalle(
       horasJustificadas: 0,
       horasPorJustificar: scheduledHoursForDate(date, dias, refrigerioMin),
     };
-    if (['NO_LABORABLE', 'VACACIONES', 'LICENCIA'].includes(row.estadoJornada)) {
-      continue;
-    }
 
     items.push({
       fecha: date,

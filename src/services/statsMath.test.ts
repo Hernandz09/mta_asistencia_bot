@@ -394,6 +394,42 @@ describe('buildPeriodDetalle', () => {
       '01/09/2026  ❌ Falta  ·  0 h',
     ]);
   });
+
+  it('lista todos los días del horario: puntual, falta y pendientes', () => {
+    const horarioJaneth: HorarioDiaStats[] = [
+      { diaSemana: 1, horaEntrada: '15:00:00', horaSalida: '21:00:00', esLaborable: true },
+      { diaSemana: 2, horaEntrada: '09:00:00', horaSalida: '15:00:00', esLaborable: true },
+      { diaSemana: 3, horaEntrada: null, horaSalida: null, esLaborable: false },
+      { diaSemana: 4, horaEntrada: '09:00:00', horaSalida: '15:00:00', esLaborable: true },
+      { diaSemana: 5, horaEntrada: '09:00:00', horaSalida: '15:00:00', esLaborable: true },
+      { diaSemana: 6, horaEntrada: '09:00:00', horaSalida: '15:00:00', esLaborable: true },
+    ];
+    const week = eachDateInclusive('2026-08-31', '2026-09-05');
+    const detalle = buildPeriodDetalle(
+      week,
+      [
+        jornada('2026-08-31', {
+          estadoEntrada: 'TARDANZA',
+          horasComputadas: 6,
+        }),
+      ],
+      horarioJaneth,
+      0,
+      {
+        today: '2026-09-01',
+        nowMinutes: 16 * 60,
+        fromDate: '2026-08-31',
+      },
+    );
+
+    expect(detalle.map((item) => item.label)).toEqual([
+      '31/08/2026  ⏰ Tardanza  ·  6 h',
+      '01/09/2026  ❌ Falta  ·  0 h',
+      '03/09/2026  ⏳ Pendiente  ·  0 h',
+      '04/09/2026  ⏳ Pendiente  ·  0 h',
+      '05/09/2026  ⏳ Pendiente  ·  0 h',
+    ]);
+  });
 });
 
 describe('formatHoursShort', () => {
