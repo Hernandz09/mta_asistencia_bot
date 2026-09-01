@@ -5,7 +5,7 @@ import {
   PresenceStatusData,
 } from 'discord.js';
 import { Pool, RowDataPacket } from 'mysql2/promise';
-import { MTA_TAGLINE } from '../config/branding';
+import { MTA_BRAND_NAME, MTA_TAGLINE } from '../config/branding';
 import { BOT_VERSION } from '../config/constants';
 import { logger } from '../utils/logger';
 
@@ -56,8 +56,8 @@ const PRESENCE: Record<
 > = {
   ACTIVO: {
     status: 'online',
-    activity: MTA_TAGLINE,
-    type: ActivityType.Custom,
+    activity: MTA_BRAND_NAME,
+    type: ActivityType.Playing,
   },
   MANTENIMIENTO: {
     status: 'idle',
@@ -352,11 +352,11 @@ export class BotStateService {
     }
     const presence = PRESENCE[estado];
     const activity: ActivitiesOptions =
-      presence.type === ActivityType.Custom
+      presence.type === ActivityType.Playing
         ? {
             name: presence.activity,
-            state: presence.activity,
-            type: ActivityType.Custom,
+            state: MTA_TAGLINE,
+            type: ActivityType.Playing,
           }
         : { name: presence.activity, type: presence.type };
     await this.client.user.setPresence({
