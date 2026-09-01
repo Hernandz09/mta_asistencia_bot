@@ -22,7 +22,7 @@ async function applyMysqlSchema(): Promise<void> {
   const pool = createMysqlPool(config);
   const sqlDir = resolve(process.cwd(), 'docs/sql');
   const sqlFiles = readdirSync(sqlDir)
-    .filter((name) => /^\d+_(schema|bot_estado)\.sql$/i.test(name))
+    .filter((name) => /^\d+_(schema|bot_estado|calculo_periodos)\.sql$/i.test(name))
     .sort();
 
   logger.info(

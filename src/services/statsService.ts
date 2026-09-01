@@ -2,8 +2,9 @@ import { Pool, RowDataPacket } from 'mysql2/promise';
 import { StatsPeriod } from '../config/constants';
 import {
   eachDateInclusive,
+  getCalendarMonthRange,
+  getCurrentMinutes,
   getCurrentWeekRange,
-  getMonthRange,
   getTodayDate,
 } from '../utils/date';
 import { logger } from '../utils/logger';
@@ -13,9 +14,11 @@ import {
   PeriodSummary,
   computeLevel,
   detalleEstadoLabel,
+  effectiveWindow,
   formatDateEs,
   formatHoursShort,
   monthLabelEs,
+  sinceDaySuffix,
   summarizePeriod,
 } from './statsMath';
 import { ConfigService } from './configService';
@@ -31,6 +34,7 @@ export interface StatsPracticante {
   area: string;
   estado: 'activo' | 'cesado' | 'suspendido';
   fechaInicio: string | null;
+  fechaFin: string | null;
   creadoEn: string;
 }
 
@@ -56,6 +60,11 @@ export interface StatsResumen {
   metaSemana: number;
   recupCumplidas: number;
   recupPendientes: number;
+  pendientes: number;
+  diasLaborablesPeriodo: number;
+  effectiveStart: string;
+  effectiveEnd: string;
+  notaMes: number | null;
   detalle: StatsDayDetail[];
 }
 
@@ -110,7 +119,7 @@ export class StatsService {
   ): Promise<StatsPracticante | null> {
     const [rows] = await this.pool.query<RowDataPacket[]>(
       `SELECT id, id_externo_bot AS discord_id, nombres, apellidos, area, estado,
-              fecha_inicio, creado_en
+              fecha_inicio, fecha_fin, creado_en
        FROM practicantes
        WHERE id_externo_bot = ?
        LIMIT 1`,
@@ -123,7 +132,7 @@ export class StatsService {
   async findPracticanteById(id: number): Promise<StatsPracticante | null> {
     const [rows] = await this.pool.query<RowDataPacket[]>(
       `SELECT id, id_externo_bot AS discord_id, nombres, apellidos, area, estado,
-              fecha_inicio, creado_en
+              fecha_inicio, fecha_fin, creado_en
        FROM practicantes
        WHERE id = ?
        LIMIT 1`,
@@ -186,42 +195,110 @@ export class StatsService {
     periodo: StatsPeriod,
   ): Promise<StatsResumen> {
     const today = getTodayDate(this.timezone);
-    const range = await this.resolveRange(practicante.id, periodo, today);
-    const [horario, jornadas, allTimeHours, recup, horasSemana] =
+    const nominal = await this.resolveRange(practicante.id, periodo, today);
+    const globalStart = this.configService
+      ? await this.configService.getAsistenciaFechaInicio()
+      : '2026-08-17';
+    const window = effectiveWindow({
+      periodStart: nominal.startDate,
+      periodEnd: nominal.endDate,
+      globalStart,
+      practicanteStart: practicante.fechaInicio,
+      practicanteEnd: practicante.fechaFin,
+      today,
+    });
+
+    const loadStart = window?.start ?? nominal.startDate;
+    const loadEnd = nominal.endDate;
+    const [horario, jornadas, allTimeHours, recup, horasSemana, feriados, weights, hoursPerLevel, contarDiaEnCurso] =
       await Promise.all([
         this.loadHorario(practicante.id),
-        this.loadJornadas(practicante.id, range.startDate, range.endDate),
+        this.loadJornadas(practicante.id, loadStart, loadEnd),
         this.loadAllTimeHours(practicante.id),
         this.loadRecuperaciones(practicante.id),
         this.loadHorasSemana(practicante.id),
+        this.loadFeriados(practicante, loadStart, loadEnd),
+        this.configService?.getNoteWeights() ?? Promise.resolve(undefined),
+        this.configService?.getHoursPerLevel() ?? Promise.resolve(undefined),
+        this.configService?.getContarDiaEnCurso() ?? Promise.resolve(false),
       ]);
 
-    const dates = eachDateInclusive(range.startDate, range.endDate);
-    const weights = this.configService
-      ? await this.configService.getNoteWeights()
-      : undefined;
-    const hoursPerLevel = this.configService
-      ? await this.configService.getHoursPerLevel()
-      : undefined;
+    const summarizeDates = window
+      ? eachDateInclusive(nominal.startDate, nominal.endDate)
+      : [];
+    const ctx = {
+      today,
+      nowMinutes: getCurrentMinutes(this.timezone),
+      fromDate: window?.start,
+      untilDate: practicante.fechaFin ?? undefined,
+      feriados,
+      contarDiaEnCurso,
+      weights,
+    };
     const summary = summarizePeriod(
-      dates,
+      summarizeDates,
       jornadas,
       horario.dias,
       horario.refrigerioMin,
-      weights,
+      ctx,
     );
     const { nivel, nextLevelHours } = computeLevel(
       allTimeHours,
       hoursPerLevel,
     );
-    const ranking = await this.computeRanking(
-      practicante,
-      range.startDate,
-      range.endDate,
-    );
+    const ranking = await this.computeRanking(practicante, nominal, {
+      globalStart,
+      today,
+      nowMinutes: ctx.nowMinutes,
+      contarDiaEnCurso,
+      weights,
+    });
+
+    let notaMes: number | null = null;
+    if (periodo === 'semana' && window) {
+      const monthNominal = getCalendarMonthRange(this.timezone);
+      const monthWindow = effectiveWindow({
+        periodStart: monthNominal.startDate,
+        periodEnd: monthNominal.endDate,
+        globalStart,
+        practicanteStart: practicante.fechaInicio,
+        practicanteEnd: practicante.fechaFin,
+        today,
+      });
+      if (monthWindow) {
+        const monthJornadas = await this.loadJornadas(
+          practicante.id,
+          monthNominal.startDate,
+          monthNominal.endDate,
+        );
+        const monthFeriados = await this.loadFeriados(
+          practicante,
+          monthNominal.startDate,
+          monthNominal.endDate,
+        );
+        const monthSummary = summarizePeriod(
+          eachDateInclusive(monthNominal.startDate, monthNominal.endDate),
+          monthJornadas,
+          horario.dias,
+          horario.refrigerioMin,
+          {
+            ...ctx,
+            fromDate: monthWindow.start,
+            feriados: monthFeriados,
+          },
+        );
+        notaMes = monthSummary.sinRegistros ? null : monthSummary.nota;
+      }
+    }
 
     const detalle = jornadas
-      .filter((row) => !['NO_LABORABLE', 'VACACIONES'].includes(row.estadoJornada))
+      .filter((row) => {
+        if (!window) return false;
+        if (['NO_LABORABLE', 'VACACIONES', 'LICENCIA'].includes(row.estadoJornada)) {
+          return false;
+        }
+        return row.fecha >= window.start && row.fecha <= window.end;
+      })
       .sort((a, b) => a.fecha.localeCompare(b.fecha))
       .map((row) => ({
         fecha: row.fecha,
@@ -232,19 +309,29 @@ export class StatsService {
     return {
       practicante,
       periodo,
-      periodoLabel: this.periodoLabel(periodo, range.startDate, range.endDate),
-      startDate: range.startDate,
-      endDate: range.endDate,
+      periodoLabel: this.periodoLabel(
+        periodo,
+        nominal.startDate,
+        nominal.endDate,
+        window?.start,
+      ),
+      startDate: window?.start ?? nominal.startDate,
+      endDate: window?.end ?? nominal.endDate,
       nivel,
       allTimeHours,
       nextLevelHours,
       ranking: ranking.position,
       rankingTotal: ranking.total,
-      summary,
+      summary: window ? summary : { ...summary, sinRegistros: true, nota: 0 },
       horasSemana,
       metaSemana: horario.limiteHorasSemana,
       recupCumplidas: recup.cumplidas,
       recupPendientes: recup.pendientes,
+      pendientes: summary.pendientes,
+      diasLaborablesPeriodo: summary.diasLaborablesPeriodo,
+      effectiveStart: window?.start ?? nominal.startDate,
+      effectiveEnd: window?.end ?? nominal.endDate,
+      notaMes,
       detalle,
     };
   }
@@ -258,9 +345,13 @@ export class StatsService {
     periodo: StatsPeriod,
     startDate: string,
     endDate: string,
+    effectiveStart?: string,
   ): string {
     if (periodo === 'mes') {
-      return monthLabelEs(endDate);
+      const suffix = effectiveStart
+        ? sinceDaySuffix(startDate, effectiveStart)
+        : '';
+      return `${monthLabelEs(endDate)}${suffix}`;
     }
     if (periodo === 'semana') {
       return `Semana del ${formatDateEs(startDate)} al ${formatDateEs(endDate)}`;
@@ -277,7 +368,7 @@ export class StatsService {
       return getCurrentWeekRange(this.timezone);
     }
     if (periodo === 'mes') {
-      return getMonthRange(this.timezone);
+      return getCalendarMonthRange(this.timezone);
     }
 
     const [rows] = await this.pool.query<RowDataPacket[]>(
@@ -288,6 +379,53 @@ export class StatsService {
       [practicanteId, today, practicanteId, today],
     );
     return { startDate: asDateString(rows[0]?.inicio ?? today), endDate: today };
+  }
+
+  private async loadFeriados(
+    practicante: StatsPracticante,
+    startDate: string,
+    endDate: string,
+  ): Promise<Set<string>> {
+    const rows = await this.loadFeriadoRows(startDate, endDate);
+    return this.feriadosFor(practicante, rows);
+  }
+
+  private async loadFeriadoRows(
+    startDate: string,
+    endDate: string,
+  ): Promise<RowDataPacket[]> {
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      `SELECT fecha, aplica_a, area, practicante_id
+       FROM feriados
+       WHERE fecha BETWEEN ? AND ?`,
+      [startDate, endDate],
+    );
+    return rows;
+  }
+
+  private feriadosFor(
+    practicante: { id: number; area: string },
+    rows: RowDataPacket[],
+  ): Set<string> {
+    const dates = new Set<string>();
+    for (const row of rows) {
+      const aplica = String(row.aplica_a);
+      if (aplica === 'todos') {
+        dates.add(asDateString(row.fecha));
+        continue;
+      }
+      if (aplica === 'area' && String(row.area ?? '') === practicante.area) {
+        dates.add(asDateString(row.fecha));
+        continue;
+      }
+      if (
+        aplica === 'practicante' &&
+        Number(row.practicante_id) === practicante.id
+      ) {
+        dates.add(asDateString(row.fecha));
+      }
+    }
+    return dates;
   }
 
   private async loadHorario(practicanteId: number): Promise<HorarioAsignado> {
@@ -375,19 +513,30 @@ export class StatsService {
 
   private async computeRanking(
     practicante: StatsPracticante,
-    startDate: string,
-    endDate: string,
+    nominal: { startDate: string; endDate: string },
+    ctx: {
+      globalStart: string;
+      today: string;
+      nowMinutes: number;
+      contarDiaEnCurso: boolean;
+      weights?: { asistencia: number; puntualidad: number; horas: number };
+    },
   ): Promise<{ position: number; total: number }> {
     try {
       const [peers] = await this.pool.query<RowDataPacket[]>(
-        `SELECT id FROM practicantes
+        `SELECT id, area, fecha_inicio, fecha_fin FROM practicantes
          WHERE area = ? AND (estado = 'activo' OR id = ?)`,
         [practicante.area, practicante.id],
       );
-      const peerIds = peers.map((row) => Number(row.id));
-      if (peerIds.length === 0) {
+      if (peers.length === 0) {
         return { position: 1, total: 1 };
       }
+
+      const peerIds = peers.map((row) => Number(row.id));
+      const feriadoRows = await this.loadFeriadoRows(
+        nominal.startDate,
+        nominal.endDate,
+      );
 
       const [jornadaRows] = await this.pool.query<RowDataPacket[]>(
         `SELECT practicante_id, fecha, estado_entrada, estado_jornada,
@@ -396,7 +545,7 @@ export class StatsService {
          WHERE contexto = 'REGULAR'
            AND fecha BETWEEN ? AND ?
            AND practicante_id IN (${peerIds.map(() => '?').join(',')})`,
-        [startDate, endDate, ...peerIds],
+        [nominal.startDate, nominal.endDate, ...peerIds],
       );
 
       const byPracticante = new Map<number, JornadaStatsRow[]>();
@@ -413,22 +562,46 @@ export class StatsService {
         horarioByPeer.set(id, await this.loadHorario(id));
       }
 
-      const dates = eachDateInclusive(startDate, endDate);
-      const weights = this.configService
-        ? await this.configService.getNoteWeights()
-        : undefined;
-      const scores = peerIds.map((id) => {
+      const dates = eachDateInclusive(nominal.startDate, nominal.endDate);
+      const scores = peers.map((row) => {
+        const id = Number(row.id);
+        const fechaInicio = row.fecha_inicio
+          ? asDateString(row.fecha_inicio)
+          : null;
+        const fechaFin = row.fecha_fin ? asDateString(row.fecha_fin) : null;
+        const window = effectiveWindow({
+          periodStart: nominal.startDate,
+          periodEnd: nominal.endDate,
+          globalStart: ctx.globalStart,
+          practicanteStart: fechaInicio,
+          practicanteEnd: fechaFin,
+          today: ctx.today,
+        });
         const horario = horarioByPeer.get(id) ?? {
           dias: [],
           refrigerioMin: 0,
           limiteHorasSemana: 30,
         };
+        if (!window) {
+          return { id, nota: 0 };
+        }
         const summary = summarizePeriod(
           dates,
           byPracticante.get(id) ?? [],
           horario.dias,
           horario.refrigerioMin,
-          weights,
+          {
+            today: ctx.today,
+            nowMinutes: ctx.nowMinutes,
+            fromDate: window.start,
+            untilDate: fechaFin ?? undefined,
+            feriados: this.feriadosFor(
+              { id, area: String(row.area) },
+              feriadoRows,
+            ),
+            contarDiaEnCurso: ctx.contarDiaEnCurso,
+            weights: ctx.weights,
+          },
         );
         return { id, nota: summary.nota };
       });
@@ -456,6 +629,7 @@ export class StatsService {
       area: String(row.area),
       estado: row.estado as StatsPracticante['estado'],
       fechaInicio: row.fecha_inicio ? asDateString(row.fecha_inicio) : null,
+      fechaFin: row.fecha_fin ? asDateString(row.fecha_fin) : null,
       creadoEn: asDateTimeString(row.creado_en),
     };
   }

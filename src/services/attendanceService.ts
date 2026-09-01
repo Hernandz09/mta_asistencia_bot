@@ -118,6 +118,14 @@ export class AttendanceService {
   }> {
     const practicante = await this.requirePracticante(discordId);
     const date = getTodayDate(this.timezone);
+    const earliest = await this.store.getEarliestAttendanceDate(practicante.id);
+    if (date < earliest) {
+      const [year, month, day] = earliest.split('-');
+      throw new AttendanceError(
+        'Punch before attendance start date',
+        `Las asistencias se registran desde el ${day}/${month}/${year}.`,
+      );
+    }
     const entryTime = getCurrentTime(this.timezone);
 
     const existing = await this.store.findTodayJornada(practicante.id, date);

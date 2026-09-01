@@ -42,6 +42,7 @@ export function buildStatsEmbed(
   const descriptionLines = [
     `⭐  **Nivel:** ${resumen.nivel} (${formatHoursShort(resumen.allTimeHours)}/${resumen.nextLevelHours} h)`,
     `👑  **Ranking:** #${resumen.ranking} de ${resumen.rankingTotal}`,
+    `📅  Registrado el ${registrado}`,
   ];
 
   if (resumen.practicante.estado === 'cesado') {
@@ -51,32 +52,59 @@ export function buildStatsEmbed(
     descriptionLines.push('_Sin registros en este periodo_');
   }
 
+  const officialNota =
+    resumen.periodo === 'semana' ? resumen.notaMes : summary.nota;
+  const hideNote =
+    summary.sinRegistros ||
+    (resumen.periodo === 'semana' && officialNota === null);
+
   const notaTexto =
     resumen.periodo === 'mes'
       ? 'Nota del mes'
       : resumen.periodo === 'semana'
-        ? 'Nota de la semana'
+        ? 'Nota del mes (referencia)'
         : 'Nota histórica';
 
+  const asistenciaLines = [
+    `✅ Puntuales: **${summary.puntuales}**`,
+    `⏰ Tardanzas: **${summary.tardanzas}**`,
+    `❌ Faltas: **${summary.faltas}**`,
+  ];
+  if (summary.pendientes > 0) {
+    asistenciaLines.push(
+      `⏳ Pendientes: **${summary.pendientes}** días por transcurrir`,
+    );
+  }
+
+  const rendimientoLines = [
+    `📊 Asistencia: **${summary.pctAsistencia}%**   🎯 Puntualidad: **${summary.pctPuntualidad}%**`,
+  ];
+  if (!hideNote && officialNota !== null) {
+    rendimientoLines.push(
+      `📝 ${notaTexto}: **${officialNota.toFixed(1)} / 20**  ·  ${notaLabel(officialNota)}`,
+    );
+  }
+
+  const evaluados = summary.programadas;
+  const cubiertos = summary.programadas + summary.pendientes;
+  const diasWord = resumen.periodo === 'semana' ? 'transcurridos' : 'evaluados';
+
   return new EmbedBuilder()
-    .setColor(notaColor(summary.nota))
+    .setColor(hideNote ? 0x95a5a6 : notaColor(officialNota ?? 0))
     .setTitle(`${target.displayName} (@${target.username})`)
     .setThumbnail(target.avatarUrl)
     .setDescription(descriptionLines.join('\n'))
     .addFields(
       {
         name: 'Asistencia',
-        value: [
-          `✅ Puntuales: **${summary.puntuales}**`,
-          `⏰ Tardanzas: **${summary.tardanzas}**`,
-          `❌ Faltas: **${summary.faltas}**`,
-        ].join('\n'),
+        value: asistenciaLines.join('\n'),
         inline: true,
       },
       {
         name: 'Horas',
         value: [
-          `🪙 Acumuladas: **${formatHoursShort(summary.horasAcumuladas)}**`,
+          `🪙 Horas del periodo: **${formatHoursShort(summary.horasAcumuladas)}**`,
+          `🏅 Total acumulado: **${formatHoursShort(resumen.allTimeHours)} h**`,
           `🏦 Esta semana:\n${weeklyProgressBar(resumen.horasSemana, resumen.metaSemana)}`,
           `📋 Por justificar: **${formatHoursShort(summary.horasPorJustificar)}**`,
         ].join('\n'),
@@ -84,10 +112,7 @@ export function buildStatsEmbed(
       },
       {
         name: 'Rendimiento',
-        value: [
-          `📊 Asistencia: **${summary.pctAsistencia}%**   🎯 Puntualidad: **${summary.pctPuntualidad}%**`,
-          `📝 ${notaTexto}: **${summary.nota.toFixed(1)} / 20**  ·  ${notaLabel(summary.nota)}`,
-        ].join('\n'),
+        value: rendimientoLines.join('\n'),
         inline: false,
       },
       {
@@ -97,7 +122,7 @@ export function buildStatsEmbed(
       },
     )
     .setFooter({
-      text: `Periodo: ${resumen.periodoLabel} · Registrado el ${registrado}`,
+      text: `Periodo: ${resumen.periodoLabel} · ${evaluados} de ${cubiertos} días ${diasWord}`,
     });
 }
 

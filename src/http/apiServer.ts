@@ -136,6 +136,7 @@ function resumenPayload(resumen: StatsResumen) {
         area: resumen.practicante.area,
         estado: resumen.practicante.estado,
         fecha_inicio: resumen.practicante.fechaInicio,
+        fecha_fin: resumen.practicante.fechaFin,
       },
       periodo: resumen.periodo,
       periodo_label: resumen.periodoLabel,
@@ -150,6 +151,7 @@ function resumenPayload(resumen: StatsResumen) {
         faltas: resumen.summary.faltas,
         programadas: resumen.summary.programadas,
         asistidas: resumen.summary.asistidas,
+        pendientes: resumen.summary.pendientes,
       },
       horas: {
         acumuladas: resumen.summary.horasAcumuladas,
@@ -161,7 +163,11 @@ function resumenPayload(resumen: StatsResumen) {
         pct_asistencia: resumen.summary.pctAsistencia,
         pct_puntualidad: resumen.summary.pctPuntualidad,
         pct_horas: resumen.summary.pctHoras,
-        nota: resumen.summary.nota,
+        nota:
+          resumen.periodo === 'semana'
+            ? resumen.notaMes
+            : resumen.summary.nota,
+        nota_mes: resumen.notaMes,
       },
       recuperaciones: {
         cumplidas: resumen.recupCumplidas,
@@ -206,6 +212,22 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
       const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`);
       const path = url.pathname.replace(/\/+$/, '') || '/';
       const method = req.method.toUpperCase();
+
+      if (method === 'GET' && (path === '/favicon.ico' || path === '/')) {
+        if (path === '/') {
+          sendJson(res, 200, {
+            data: {
+              servicio: 'Bot de Asistencias MTA',
+              health: '/api/v1/bot/health',
+              api: '/api/v1',
+            },
+          });
+          return;
+        }
+        res.writeHead(204);
+        res.end();
+        return;
+      }
 
       if (
         (method === 'GET' && path === '/health') ||

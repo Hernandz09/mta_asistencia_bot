@@ -4,6 +4,7 @@ import {
   eachDateInclusive,
   formatDurationHours,
   formatDurationHoursWords,
+  getCalendarMonthRange,
   getCurrentWeekRange,
   getMonthRange,
   getWeekdayNumber,
@@ -102,6 +103,16 @@ describe('getMonthRange', () => {
   it('va del 1 del mes hasta hoy', () => {
     const midMonth = new Date('2026-08-31T18:00:00Z');
     expect(getMonthRange('America/Lima', midMonth)).toEqual({
+      startDate: '2026-08-01',
+      endDate: '2026-08-31',
+    });
+  });
+});
+
+describe('getCalendarMonthRange', () => {
+  it('devuelve el mes calendario completo', () => {
+    const midMonth = new Date('2026-08-20T18:00:00Z');
+    expect(getCalendarMonthRange('America/Lima', midMonth)).toEqual({
       startDate: '2026-08-01',
       endDate: '2026-08-31',
     });

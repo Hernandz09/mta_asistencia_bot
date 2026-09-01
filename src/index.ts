@@ -48,6 +48,7 @@ async function main(): Promise<void> {
     statsService,
     botStateService,
     adminRoleId: config.discord.adminRoleId,
+    attendanceChannelId: config.discord.attendanceChannelId,
     timezone: config.timezone,
   };
 

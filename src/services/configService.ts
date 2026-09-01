@@ -16,6 +16,9 @@ const EDITABLE = new Set([
   'alerta_limite_horas_pct',
   'limite_horas_semana_default',
   'hours_per_level',
+  'asistencia.fecha_inicio',
+  'asistencia.contar_dia_en_curso',
+  'nota.periodo_base',
 ]);
 
 const READONLY = new Set(['schema_spec']);
@@ -26,6 +29,24 @@ function validateValor(clave: string, valor: string): string | null {
 
   if (clave === 'timezone') {
     return trimmed.length > 64 ? 'timezone demasiado largo.' : null;
+  }
+
+  if (clave === 'asistencia.fecha_inicio') {
+    return /^\d{4}-\d{2}-\d{2}$/.test(trimmed)
+      ? null
+      : 'asistencia.fecha_inicio debe ser YYYY-MM-DD.';
+  }
+
+  if (clave === 'asistencia.contar_dia_en_curso') {
+    return trimmed === '0' || trimmed === '1'
+      ? null
+      : 'asistencia.contar_dia_en_curso debe ser 0 o 1.';
+  }
+
+  if (clave === 'nota.periodo_base') {
+    return ['MES', 'SEMANA', 'TOTAL'].includes(trimmed.toUpperCase())
+      ? null
+      : 'nota.periodo_base debe ser MES, SEMANA o TOTAL.';
   }
 
   const numeric = Number(trimmed);
@@ -82,12 +103,30 @@ export class ConfigService {
   }> {
     const map = await this.getMap();
     return {
-      asistencia: Number(map.nota_peso_asistencia ?? NOTE_WEIGHTS.asistencia),
-      puntualidad: Number(
-        map.nota_peso_puntualidad ?? NOTE_WEIGHTS.puntualidad,
+      asistencia: Number(
+        map['nota.peso_asistencia'] ??
+          map.nota_peso_asistencia ??
+          NOTE_WEIGHTS.asistencia,
       ),
-      horas: Number(map.nota_peso_horas ?? NOTE_WEIGHTS.horas),
+      puntualidad: Number(
+        map['nota.peso_puntualidad'] ??
+          map.nota_peso_puntualidad ??
+          NOTE_WEIGHTS.puntualidad,
+      ),
+      horas: Number(
+        map['nota.peso_horas'] ?? map.nota_peso_horas ?? NOTE_WEIGHTS.horas,
+      ),
     };
+  }
+
+  async getAsistenciaFechaInicio(): Promise<string> {
+    const map = await this.getMap();
+    return map['asistencia.fecha_inicio'] ?? '2026-08-17';
+  }
+
+  async getContarDiaEnCurso(): Promise<boolean> {
+    const map = await this.getMap();
+    return (map['asistencia.contar_dia_en_curso'] ?? '0') === '1';
   }
 
   async getHoursPerLevel(): Promise<number> {
@@ -138,7 +177,10 @@ export class ConfigService {
   private async ensureDefaults(): Promise<void> {
     await this.pool.query(
       `INSERT INTO config_sistema (clave, valor, descripcion) VALUES
-         ('hours_per_level', ?, 'Horas acumuladas para subir un nivel en /stats')
+         ('hours_per_level', ?, 'Horas acumuladas para subir un nivel en /stats'),
+         ('asistencia.fecha_inicio', '2026-08-17', 'Primera fecha con registro de asistencias'),
+         ('asistencia.contar_dia_en_curso', '0', 'Si el día de hoy entra al denominador antes de cerrar su ventana'),
+         ('nota.periodo_base', 'MES', 'Periodo sobre el que se calcula la nota oficial')
        ON DUPLICATE KEY UPDATE descripcion = VALUES(descripcion)`,
       [String(HOURS_PER_LEVEL)],
     );

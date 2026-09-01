@@ -29,6 +29,8 @@ export interface PeriodSummary {
   puntuales: number;
   tardanzas: number;
   faltas: number;
+  pendientes: number;
+  diasLaborablesPeriodo: number;
   horasAcumuladas: number;
   horasPorJustificar: number;
   horasProgramadas: number;
@@ -39,14 +41,66 @@ export interface PeriodSummary {
   sinRegistros: boolean;
 }
 
+export interface SummarizeContext {
+  today: string;
+  nowMinutes: number;
+  /** Días anteriores no entran ni como falta ni como pendiente. */
+  fromDate?: string;
+  /** Días posteriores (p. ej. cesado) no entran al cálculo. */
+  untilDate?: string;
+  feriados?: Set<string>;
+  contarDiaEnCurso?: boolean;
+  toleranciaEntradaMin?: number;
+  weights?: { asistencia: number; puntualidad: number; horas: number };
+}
+
+export function maxIsoDate(
+  ...values: Array<string | null | undefined>
+): string | null {
+  const dates = values.filter((value): value is string => Boolean(value));
+  if (dates.length === 0) return null;
+  return dates.reduce((best, item) => (item > best ? item : best));
+}
+
+export function minIsoDate(
+  ...values: Array<string | null | undefined>
+): string | null {
+  const dates = values.filter((value): value is string => Boolean(value));
+  if (dates.length === 0) return null;
+  return dates.reduce((best, item) => (item < best ? item : best));
+}
+
+export function effectiveWindow(params: {
+  periodStart: string;
+  periodEnd: string;
+  globalStart?: string | null;
+  practicanteStart?: string | null;
+  practicanteEnd?: string | null;
+  today: string;
+}): { start: string; end: string } | null {
+  const start = maxIsoDate(
+    params.periodStart,
+    params.globalStart,
+    params.practicanteStart,
+  );
+  const end = minIsoDate(
+    params.periodEnd,
+    params.today,
+    params.practicanteEnd ?? params.today,
+  );
+  if (!start || !end || start > end) {
+    return null;
+  }
+  return { start, end };
+}
+
 const ASISTIDAS = new Set([
   'CERRADA',
   'ABIERTA',
   'FALTA_JUSTIFICADA',
-  'LICENCIA',
 ]);
 
-const NO_PROGRAMADAS = new Set(['NO_LABORABLE', 'VACACIONES']);
+const NO_PROGRAMADAS = new Set(['NO_LABORABLE', 'VACACIONES', 'LICENCIA']);
 
 export function round1(value: number): number {
   return Math.round(value * 10) / 10;
@@ -132,6 +186,17 @@ export function monthLabelEs(isoDate: string): string {
   return `${MESES_ES[Number(month) - 1]} ${year}`;
 }
 
+/** Pie de embed: "(desde el 17)" cuando la ventana no empieza el día 1 del periodo. */
+export function sinceDaySuffix(
+  periodStart: string,
+  effectiveStart: string,
+): string {
+  if (!effectiveStart || effectiveStart <= periodStart) {
+    return '';
+  }
+  return ` (desde el ${Number(effectiveStart.slice(8))})`;
+}
+
 function ratioPct(numerator: number, denominator: number): number {
   if (denominator <= 0) return 0;
   return round1((numerator / denominator) * 100);
@@ -182,21 +247,58 @@ export function summarizePeriod(
   jornadas: JornadaStatsRow[],
   dias: HorarioDiaStats[],
   refrigerioMin: number,
-  weights: { asistencia: number; puntualidad: number; horas: number } = NOTE_WEIGHTS,
+  weightsOrContext:
+    | { asistencia: number; puntualidad: number; horas: number }
+    | SummarizeContext = NOTE_WEIGHTS,
 ): PeriodSummary {
+  const context: SummarizeContext =
+    'today' in weightsOrContext
+      ? weightsOrContext
+      : { today: '9999-12-31', nowMinutes: 24 * 60, weights: weightsOrContext };
+
+  const weights = context.weights ?? NOTE_WEIGHTS;
+  const feriados = context.feriados ?? new Set<string>();
+  const tolerancia = context.toleranciaEntradaMin ?? 5;
   const byDate = new Map(jornadas.map((row) => [row.fecha, row]));
   let programadas = 0;
   let asistidas = 0;
   let puntuales = 0;
   let tardanzas = 0;
   let faltas = 0;
+  let pendientes = 0;
+  let diasLaborablesPeriodo = 0;
   let horasAcumuladas = 0;
   let horasPorJustificar = 0;
   let horasProgramadas = 0;
 
   for (const date of dates) {
+    if (context.fromDate && date < context.fromDate) {
+      continue;
+    }
+    if (context.untilDate && date > context.untilDate) {
+      continue;
+    }
+
     const jornada = byDate.get(date);
-    if (!isLaborableDate(date, dias, jornada)) {
+    if (feriados.has(date) || !isLaborableDate(date, dias, jornada)) {
+      continue;
+    }
+
+    diasLaborablesPeriodo += 1;
+
+    if (date > context.today) {
+      pendientes += 1;
+      continue;
+    }
+
+    const pendingToday =
+      date === context.today &&
+      !context.contarDiaEnCurso &&
+      !(jornada && isAsistida(jornada)) &&
+      isEntryWindowOpen(date, dias, context.nowMinutes, tolerancia);
+
+    if (pendingToday) {
+      pendientes += 1;
       continue;
     }
 
@@ -223,7 +325,8 @@ export function summarizePeriod(
 
   const pctAsistencia = ratioPct(asistidas, programadas);
   const pctPuntualidad = ratioPct(puntuales, asistidas);
-  const pctHoras = ratioPct(horasAcumuladas, horasProgramadas);
+  const pctHorasRaw = ratioPct(horasAcumuladas, horasProgramadas);
+  const pctHoras = Math.min(100, pctHorasRaw);
 
   return {
     programadas,
@@ -231,6 +334,8 @@ export function summarizePeriod(
     puntuales,
     tardanzas,
     faltas,
+    pendientes,
+    diasLaborablesPeriodo,
     horasAcumuladas: round1(horasAcumuladas),
     horasPorJustificar: round1(horasPorJustificar),
     horasProgramadas: round1(horasProgramadas),
@@ -238,8 +343,27 @@ export function summarizePeriod(
     pctPuntualidad,
     pctHoras,
     nota: computeNota(pctAsistencia, pctPuntualidad, pctHoras, weights),
-    sinRegistros: jornadas.length === 0,
+    sinRegistros: programadas === 0,
   };
+}
+
+function isEntryWindowOpen(
+  date: string,
+  dias: HorarioDiaStats[],
+  nowMinutes: number,
+  toleranciaEntradaMin: number,
+): boolean {
+  const weekday = getWeekdayNumber(date);
+  const dia = dias.find((item) => item.diaSemana === weekday);
+  if (!dia?.horaEntrada) return false;
+  const limit =
+    parseTimeToMinutesSafe(dia.horaEntrada) + toleranciaEntradaMin;
+  return nowMinutes <= limit;
+}
+
+function parseTimeToMinutesSafe(time: string): number {
+  const [hours, minutes] = time.split(':').map(Number);
+  return (hours ?? 0) * 60 + (minutes ?? 0);
 }
 
 export function detalleEstadoLabel(jornada: JornadaStatsRow): string {

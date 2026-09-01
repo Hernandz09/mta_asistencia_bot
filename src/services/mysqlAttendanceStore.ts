@@ -119,6 +119,28 @@ export class MysqlAttendanceStore {
     return rows[0] ? Number(rows[0].limite_horas_semana) : 30;
   }
 
+  async getEarliestAttendanceDate(practicanteId: number): Promise<string> {
+    const [[configRows], [pracRows]] = await Promise.all([
+      this.pool.query<RowDataPacket[]>(
+        `SELECT valor FROM config_sistema
+         WHERE clave = 'asistencia.fecha_inicio' LIMIT 1`,
+      ),
+      this.pool.query<RowDataPacket[]>(
+        `SELECT fecha_inicio FROM practicantes WHERE id = ? LIMIT 1`,
+        [practicanteId],
+      ),
+    ]);
+    const global = configRows[0]?.valor
+      ? String(configRows[0].valor).slice(0, 10)
+      : '2026-08-17';
+    const own = pracRows[0]?.fecha_inicio
+      ? pracRows[0].fecha_inicio instanceof Date
+        ? pracRows[0].fecha_inicio.toISOString().slice(0, 10)
+        : String(pracRows[0].fecha_inicio).slice(0, 10)
+      : null;
+    return own && own > global ? own : global;
+  }
+
   async sumHorasSemana(
     practicanteId: number,
     startDate: string,

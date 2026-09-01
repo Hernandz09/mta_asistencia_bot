@@ -32,6 +32,29 @@ import { getTodayDate } from '../utils/date';
 import { hasStaffRole } from '../utils/roles';
 import { logger } from '../utils/logger';
 
+function isPublishableChannel(channel: unknown): channel is {
+  send: (options: { embeds: ReturnType<typeof buildStatsEmbed>[] }) => Promise<unknown>;
+} {
+  if (!channel || typeof channel !== 'object') {
+    return false;
+  }
+  const ch = channel as {
+    isSendable?: () => boolean;
+    isVoiceBased?: () => boolean;
+    send?: unknown;
+  };
+  if (typeof ch.send !== 'function') {
+    return false;
+  }
+  if (typeof ch.isVoiceBased === 'function' && ch.isVoiceBased()) {
+    return false;
+  }
+  if (typeof ch.isSendable === 'function' && !ch.isSendable()) {
+    return false;
+  }
+  return true;
+}
+
 function parseStatsCustomId(customId: string): {
   action: string;
   periodo?: StatsPeriod;
@@ -147,15 +170,33 @@ export async function handleStatsButton(
         });
         return true;
       }
-      if (!interaction.channel || !interaction.channel.isSendable()) {
+      let published = false;
+      if (isPublishableChannel(interaction.channel)) {
+        await interaction.channel.send({
+          embeds: [buildStatsEmbed(target, resumen)],
+        });
+        published = true;
+      } else if (context.attendanceChannelId) {
+        const fallback = await interaction.client.channels
+          .fetch(context.attendanceChannelId)
+          .catch(() => null);
+        if (isPublishableChannel(fallback)) {
+          await fallback.send({
+            embeds: [buildStatsEmbed(target, resumen)],
+          });
+          published = true;
+        }
+      }
+      if (!published) {
         await interaction.editReply({
-          embeds: [buildErrorEmbed('No pude publicar en este canal.')],
+          embeds: [
+            buildErrorEmbed(
+              'No pude publicar aquí. Usa el comando en un canal de texto, no de voz.',
+            ),
+          ],
         });
         return true;
       }
-      await interaction.channel.send({
-        embeds: [buildStatsEmbed(target, resumen)],
-      });
       await interaction.editReply({
         embeds: [
           buildErrorEmbed('Estadísticas publicadas en el canal.').setColor(

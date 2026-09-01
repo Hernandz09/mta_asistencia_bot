@@ -21,6 +21,7 @@ export interface CommandContext {
   statsService: StatsService;
   botStateService: BotStateService;
   adminRoleId?: string;
+  attendanceChannelId?: string;
   timezone: string;
 }
 

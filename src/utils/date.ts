@@ -133,6 +133,27 @@ export function getMonthRange(
   return { startDate: `${year}-${month}-01`, endDate: today };
 }
 
+/** Mes calendario completo (día 1 al último), para recortar luego con la ventana efectiva. */
+export function getCalendarMonthRange(
+  timezone: string,
+  referenceDate: Date = new Date(),
+): { startDate: string; endDate: string } {
+  const today = getTodayDate(timezone, referenceDate);
+  const [y, m] = today.split('-').map(Number);
+  const last = new Date(Date.UTC(y, m, 0));
+  return {
+    startDate: `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-01`,
+    endDate: formatUtcDate(last),
+  };
+}
+
+export function getCurrentMinutes(
+  timezone: string,
+  referenceDate: Date = new Date(),
+): number {
+  return parseTimeToMinutes(getCurrentTime(timezone, referenceDate));
+}
+
 export function eachDateInclusive(startDate: string, endDate: string): string[] {
   const dates: string[] = [];
   const [ys, ms, ds] = startDate.split('-').map(Number);
