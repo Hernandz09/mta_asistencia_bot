@@ -1,11 +1,6 @@
 import { EmbedBuilder } from 'discord.js';
 import { WeeklySummary } from '../services/attendanceService';
 import {
-  MTA_BRAND_NAME,
-  MTA_TAGLINE,
-  MTA_WEBSITE_URL,
-} from '../config/branding';
-import {
   ATTENDANCE_STATUS_LABELS,
   EMBED_COLORS,
   EMPTY_DISPLAY_VALUE,
@@ -20,27 +15,15 @@ function formatHoras(hours: number | null): string {
   return hours === null ? EMPTY_DISPLAY_VALUE : formatDurationHoursWords(hours);
 }
 
-export function buildAttendancePanelEmbed(avatarUrl?: string): EmbedBuilder {
-  const embed = new EmbedBuilder()
+export function buildAttendancePanelEmbed(): EmbedBuilder {
+  return new EmbedBuilder()
     .setColor(EMBED_COLORS.INFO)
     .setTitle('Registro de asistencia')
     .setDescription(
       'Usa los botones de abajo para marcar tu entrada o salida del día.\n\n' +
         'Tu horario depende del día: usa `/stats` para ver tu desempeño, ' +
         '`/asistencia estado` para el registro de hoy y `/asistencia semana` para las horas acumuladas.',
-    )
-    .addFields({
-      name: MTA_BRAND_NAME,
-      value:
-        `💻 ${MTA_TAGLINE}\n` +
-        `[${MTA_WEBSITE_URL.replace(/^https?:\/\//, '').replace(/\/$/, '')}](${MTA_WEBSITE_URL})`,
-    });
-
-  if (avatarUrl) {
-    embed.setThumbnail(avatarUrl);
-  }
-
-  return embed;
+    );
 }
 
 export function buildEntrySuccessEmbed(

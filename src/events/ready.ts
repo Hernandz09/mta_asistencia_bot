@@ -8,7 +8,7 @@ import {
 import { BUSINESS_RULES } from '../config/business';
 import { BUTTON_CUSTOM_IDS } from '../config/constants';
 import { AppConfig } from '../config/env';
-import { buildAttendancePanelComponents } from '../components/attendanceButtons';
+import { buildAttendanceButtonRow } from '../components/attendanceButtons';
 import { buildAttendancePanelEmbed } from '../embeds/response.embeds';
 import { AttendanceService } from '../services/attendanceService';
 import { BotStateService } from '../services/botStateService';
@@ -59,12 +59,8 @@ async function ensureAttendancePanel(
   }
   const botUserId = botUser.id;
 
-  const avatarUrl = botUser.displayAvatarURL({
-    size: 256,
-    forceStatic: false,
-  });
-  const embeds = [buildAttendancePanelEmbed(avatarUrl)];
-  const components = buildAttendancePanelComponents();
+  const embeds = [buildAttendancePanelEmbed()];
+  const components = [buildAttendanceButtonRow()];
 
   const pinnedMessages = await channel.messages.fetchPinned();
   let existingPanel = pinnedMessages.find((message) =>
