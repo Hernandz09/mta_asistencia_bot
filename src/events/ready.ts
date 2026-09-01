@@ -8,10 +8,11 @@ import {
 import { BUSINESS_RULES } from '../config/business';
 import { BUTTON_CUSTOM_IDS } from '../config/constants';
 import { AppConfig } from '../config/env';
-import { buildAttendanceButtonRow } from '../components/attendanceButtons';
+import { buildAttendancePanelComponents } from '../components/attendanceButtons';
 import { buildAttendancePanelEmbed } from '../embeds/response.embeds';
 import { AttendanceService } from '../services/attendanceService';
 import { BotStateService } from '../services/botStateService';
+import { syncBotAvatar } from '../services/botProfileService';
 import { RankingService } from '../services/rankingService';
 import { scheduleAutoClose, scheduleRankingSnapshots } from '../services/autoCloseJob';
 import { ScheduleService } from '../services/scheduleService';
@@ -52,13 +53,18 @@ async function ensureAttendancePanel(
     );
   }
 
-  const botUserId = client.user?.id;
-  if (!botUserId) {
+  const botUser = client.user;
+  if (!botUser) {
     throw new Error('El cliente de Discord no tiene usuario listo');
   }
+  const botUserId = botUser.id;
 
-  const embeds = [buildAttendancePanelEmbed()];
-  const components = [buildAttendanceButtonRow()];
+  const avatarUrl = botUser.displayAvatarURL({
+    size: 256,
+    forceStatic: false,
+  });
+  const embeds = [buildAttendancePanelEmbed(avatarUrl)];
+  const components = buildAttendancePanelComponents();
 
   const pinnedMessages = await channel.messages.fetchPinned();
   let existingPanel = pinnedMessages.find((message) =>
@@ -105,6 +111,11 @@ export function registerReadyWithInit(
       await attendanceService.initialize();
       await scheduleService.initialize();
       botStateService.attachClient(readyClient);
+      try {
+        await syncBotAvatar(readyClient);
+      } catch (error) {
+        logger.warn('No se pudo aplicar el avatar animado:', error);
+      }
       await botStateService.refreshPresence();
       botStateService.startPolling();
       scheduleAutoClose(

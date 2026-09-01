@@ -1,9 +1,11 @@
 import {
+  ActivitiesOptions,
   ActivityType,
   Client,
   PresenceStatusData,
 } from 'discord.js';
 import { Pool, RowDataPacket } from 'mysql2/promise';
+import { MTA_TAGLINE } from '../config/branding';
 import { BOT_VERSION } from '../config/constants';
 import { logger } from '../utils/logger';
 
@@ -50,11 +52,23 @@ const DEFAULT_ESTADO: BotEstado = {
 
 const PRESENCE: Record<
   BotEstadoNombre,
-  { status: PresenceStatusData; activity: string }
+  { status: PresenceStatusData; activity: string; type: ActivityType }
 > = {
-  ACTIVO: { status: 'online', activity: 'Registrando asistencias' },
-  MANTENIMIENTO: { status: 'idle', activity: 'En mantenimiento' },
-  DESACTIVADO: { status: 'dnd', activity: 'Fuera de servicio' },
+  ACTIVO: {
+    status: 'online',
+    activity: MTA_TAGLINE,
+    type: ActivityType.Custom,
+  },
+  MANTENIMIENTO: {
+    status: 'idle',
+    activity: 'En mantenimiento',
+    type: ActivityType.Watching,
+  },
+  DESACTIVADO: {
+    status: 'dnd',
+    activity: 'Fuera de servicio',
+    type: ActivityType.Watching,
+  },
 };
 
 export class BotStateService {
@@ -337,9 +351,17 @@ export class BotStateService {
       return;
     }
     const presence = PRESENCE[estado];
+    const activity: ActivitiesOptions =
+      presence.type === ActivityType.Custom
+        ? {
+            name: presence.activity,
+            state: presence.activity,
+            type: ActivityType.Custom,
+          }
+        : { name: presence.activity, type: presence.type };
     await this.client.user.setPresence({
       status: presence.status,
-      activities: [{ name: presence.activity, type: ActivityType.Watching }],
+      activities: [activity],
     });
     this.lastApplied = estado;
     logger.info(`Presencia Discord: ${estado} — ${presence.activity}`);
