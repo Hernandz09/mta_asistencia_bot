@@ -20,9 +20,9 @@ export function buildAttendancePanelEmbed(): EmbedBuilder {
     .setColor(EMBED_COLORS.INFO)
     .setTitle('Registro de asistencia')
     .setDescription(
-      'Usa los botones de abajo para marcar tu entrada o salida del día.\n\n' +
-        'Tu horario depende del día: usa `/asistencia estado` para ver tu registro de hoy ' +
-        'y `/asistencia semana` para ver tus horas acumuladas.',
+        'Usa los botones de abajo para marcar tu entrada o salida del día.\n\n' +
+        'Tu horario depende del día: usa `/stats` para ver tu desempeño, ' +
+        '`/asistencia estado` para el registro de hoy y `/asistencia semana` para las horas acumuladas.',
     );
 }
 

@@ -12,6 +12,8 @@ interface Bloque {
 
 interface HorarioPracticante {
   nombre: string;
+  carrera?: string;
+  ciclo?: string;
   dias: Partial<Record<Dia, Bloque>>;
 }
 
@@ -100,6 +102,30 @@ export const PRACTICANTES_SCHEDULE: HorarioPracticante[] = [
       4: { inicio: '09:00', fin: '15:00' },
       5: { inicio: '09:00', fin: '15:00' },
       6: { inicio: '12:15', fin: '18:15' },
+    },
+  },
+  {
+    nombre: 'Kevin Ludeña',
+    carrera: 'Desarrollo de software',
+    ciclo: '6to',
+    dias: {
+      1: { inicio: '09:00', fin: '15:00' },
+      2: { inicio: '09:00', fin: '15:00' },
+      3: { inicio: '09:00', fin: '15:00' },
+      4: { inicio: '14:00', fin: '20:00' },
+      6: { inicio: '09:00', fin: '15:00' },
+    },
+  },
+  {
+    nombre: 'Alfredo Gonzales',
+    carrera: 'Ing. Software con Inteligencia',
+    ciclo: '6to',
+    dias: {
+      1: { inicio: '09:00', fin: '15:00' },
+      3: { inicio: '09:00', fin: '15:00' },
+      4: { inicio: '13:45', fin: '19:45' },
+      5: { inicio: '09:00', fin: '15:00' },
+      6: { inicio: '09:00', fin: '15:00' },
     },
   },
 ];

@@ -123,3 +123,36 @@ export function getCurrentWeekRange(
     endDate: formatUtcDate(saturday),
   };
 }
+
+export function getMonthRange(
+  timezone: string,
+  referenceDate: Date = new Date(),
+): { startDate: string; endDate: string } {
+  const today = getTodayDate(timezone, referenceDate);
+  const [year, month] = today.split('-');
+  return { startDate: `${year}-${month}-01`, endDate: today };
+}
+
+export function eachDateInclusive(startDate: string, endDate: string): string[] {
+  const dates: string[] = [];
+  const [ys, ms, ds] = startDate.split('-').map(Number);
+  const [ye, me, de] = endDate.split('-').map(Number);
+  const cursor = new Date(Date.UTC(ys, ms - 1, ds));
+  const last = new Date(Date.UTC(ye, me - 1, de));
+
+  while (cursor <= last) {
+    dates.push(formatUtcDate(cursor));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  return dates;
+}
+
+/** America/Lima no usa DST: UTC−5. Convierte fecha+hora locales a UTC. */
+export function limaLocalToUtc(date: string, time: string): Date {
+  const [year, month, day] = date.split('-').map(Number);
+  const [hours, minutes, seconds] = time.split(':').map(Number);
+  return new Date(
+    Date.UTC(year, month - 1, day, (hours ?? 0) + 5, minutes ?? 0, seconds ?? 0),
+  );
+}

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   computeHoursDifference,
+  eachDateInclusive,
   formatDurationHours,
   formatDurationHoursWords,
   getCurrentWeekRange,
+  getMonthRange,
   getWeekdayNumber,
 } from './date';
 
@@ -93,5 +95,24 @@ describe('getCurrentWeekRange', () => {
       startDate: '2026-08-17',
       endDate: '2026-08-22',
     });
+  });
+});
+
+describe('getMonthRange', () => {
+  it('va del 1 del mes hasta hoy', () => {
+    const midMonth = new Date('2026-08-31T18:00:00Z');
+    expect(getMonthRange('America/Lima', midMonth)).toEqual({
+      startDate: '2026-08-01',
+      endDate: '2026-08-31',
+    });
+  });
+});
+
+describe('eachDateInclusive', () => {
+  it('incluye ambos extremos', () => {
+    expect(eachDateInclusive('2026-08-30', '2026-08-31')).toEqual([
+      '2026-08-30',
+      '2026-08-31',
+    ]);
   });
 });

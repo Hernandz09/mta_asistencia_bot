@@ -45,9 +45,13 @@ export const DEFAULT_TIMEZONE = 'America/Mexico_City';
 
 export const ATTENDANCE_STATUS = {
   PUNTUAL: 'Puntual',
+  PUNTUAL_ANTICIPADO: 'Puntual anticipado',
   TARDANZA: 'Tardanza',
   FUERA_DE_HORARIO: 'Fuera de horario',
+  SALIDA_ANTICIPADA: 'Salida anticipada',
+  FUERA_DE_HORA_SALIDA: 'Fuera de hora de salida',
   INCOMPLETO: 'Incompleto',
+  SIN_SALIDA: 'Sin salida',
   SIN_REGISTRO: 'Sin registro',
 } as const;
 
@@ -56,9 +60,13 @@ export const ATTENDANCE_STATUS_LABELS: Record<
   string
 > = {
   [ATTENDANCE_STATUS.PUNTUAL]: 'Puntual',
+  [ATTENDANCE_STATUS.PUNTUAL_ANTICIPADO]: 'Puntual anticipado',
   [ATTENDANCE_STATUS.TARDANZA]: 'Tardanza',
   [ATTENDANCE_STATUS.FUERA_DE_HORARIO]: 'Fuera de horario',
+  [ATTENDANCE_STATUS.SALIDA_ANTICIPADA]: 'Salida anticipada',
+  [ATTENDANCE_STATUS.FUERA_DE_HORA_SALIDA]: 'Fuera de hora de salida',
   [ATTENDANCE_STATUS.INCOMPLETO]: 'Incompleto',
+  [ATTENDANCE_STATUS.SIN_SALIDA]: 'Sin salida',
   [ATTENDANCE_STATUS.SIN_REGISTRO]: 'Sin registro',
 };
 
@@ -67,11 +75,49 @@ export const GOOGLE_SHEETS_SCOPE =
 
 export const COMMAND_NAMES = {
   ASISTENCIA: 'asistencia',
+  STATS: 'stats',
+  ESTADISTICAS: 'estadisticas',
+  STATUS: 'status',
 } as const;
 
 export const BUTTON_CUSTOM_IDS = {
   MARCAR_ENTRADA: 'marcar_entrada',
   MARCAR_SALIDA: 'marcar_salida',
+} as const;
+
+export const STATS_CUSTOM_IDS = {
+  DETALLE: 'stats_detalle',
+  PUBLICAR: 'stats_publicar',
+  PERIODO: 'stats_periodo',
+} as const;
+
+export const STATUS_CUSTOM_IDS = {
+  CAMBIAR: 'bot_estado_cambiar',
+} as const;
+
+export const STATS_PERIODS = ['semana', 'mes', 'total'] as const;
+export type StatsPeriod = (typeof STATS_PERIODS)[number];
+
+export const HOURS_PER_LEVEL = 100;
+export const BOT_VERSION = '2.1.0';
+
+export const NOTE_WEIGHTS = {
+  asistencia: 0.4,
+  puntualidad: 0.3,
+  horas: 0.3,
+} as const;
+
+export const NOTE_COLORS = {
+  EXCELENTE: 0x2ecc71,
+  BUENO: 0x3498db,
+  REGULAR: 0xf1c40f,
+  DEFICIENTE: 0xe74c3c,
+} as const;
+
+export const BOT_ESTADO_COLORS = {
+  ACTIVO: 0x2ecc71,
+  MANTENIMIENTO: 0xf1c40f,
+  DESACTIVADO: 0xe74c3c,
 } as const;
 
 export const EMPTY_DISPLAY_VALUE = '—';

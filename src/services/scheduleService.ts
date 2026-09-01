@@ -6,6 +6,12 @@ import { logger } from '../utils/logger';
 
 const TIME_FORMAT = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
+function formatClock(totalMinutes: number): string {
+  const hours = Math.floor(totalMinutes / 60) % 24;
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
 export interface ScheduleBlock {
   start: string;
   end: string;
@@ -29,7 +35,7 @@ export interface ScheduleReloadResult {
   errors: string[];
 }
 
-/** Lo mínimo que ScheduleService necesita de la fuente de datos (Sheets en prod, fake en tests). */
+/** Lo mínimo que ScheduleService necesita de la fuente de datos (MySQL en prod, fake en tests). */
 export interface HorariosRepository {
   ensureSheetExists(): Promise<void>;
   readAll(): Promise<string[][]>;
@@ -193,7 +199,7 @@ export class ScheduleService {
 
       if (errors.length > 0) {
         logger.warn(
-          `Horarios: ${errors.length} fila(s) inválida(s) en la hoja Horarios:`,
+          `Horarios: ${errors.length} fila(s) inválida(s):`,
           errors,
         );
       }
@@ -205,12 +211,12 @@ export class ScheduleService {
       return { loaded: entries.length, errors };
     } catch (error) {
       logger.error(
-        'Error al leer la hoja Horarios, se conserva el caché anterior:',
+        'Error al leer horarios, se conserva el caché anterior:',
         error,
       );
       return {
         loaded: this.countCachedEntries(),
-        errors: ['No se pudo leer la hoja Horarios (ver logs del bot).'],
+        errors: ['No se pudieron leer los horarios (ver logs del bot).'],
       };
     }
   }
@@ -225,6 +231,30 @@ export class ScheduleService {
     const entry = entries.find((candidate) => candidate.dia === dia);
 
     return entry ? { start: entry.start, end: entry.end } : null;
+  }
+
+  /** Ventana de entrada del día: hora más temprana → la más tardía + tolerancia. */
+  getTodayEntryWindow(dateStr: string): string | null {
+    const dia = getWeekdayNumber(dateStr);
+    let minStart: number | null = null;
+    let maxStart: number | null = null;
+
+    for (const entries of this.cache.values()) {
+      for (const entry of entries) {
+        if (entry.dia !== dia) continue;
+        const minutes = parseTimeToMinutes(entry.start);
+        if (minStart === null || minutes < minStart) minStart = minutes;
+        if (maxStart === null || minutes > maxStart) maxStart = minutes;
+      }
+    }
+
+    if (minStart === null || maxStart === null) {
+      return null;
+    }
+
+    const end =
+      maxStart + BUSINESS_RULES.punctuality.toleranceMinutes;
+    return `${formatClock(minStart)} – ${formatClock(end)}`;
   }
 
   private countCachedEntries(): number {

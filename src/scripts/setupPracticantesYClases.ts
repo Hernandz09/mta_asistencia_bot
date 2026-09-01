@@ -20,6 +20,8 @@ const CARRERA_CICLO_POR_NOMBRE: Record<string, CarreraCiclo> = {
   'Carlos Yamacacho': { carrera: 'Ing. Software con Inteligencia', ciclo: '6to' },
   'Deivyd Saul': { carrera: 'Ing. Software con Inteligencia', ciclo: '4to' },
   'Diego Galarza': { carrera: 'Ing. Software con Inteligencia', ciclo: '6to' },
+  'Kevin Ludeña': { carrera: 'Desarrollo de software', ciclo: '6to' },
+  'Alfredo Gonzales': { carrera: 'Ing. Software con Inteligencia', ciclo: '6to' },
 };
 
 /** Deriva (discord_id, nombre) únicos desde las filas ya cargadas en Horarios. */

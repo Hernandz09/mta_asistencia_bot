@@ -19,3 +19,23 @@ export function loadGoogleConfig(): GoogleConfig {
     privateKey: requireEnv('GOOGLE_PRIVATE_KEY').trim().replace(/\\n/g, '\n'),
   };
 }
+
+/** Sheets es respaldo de emergencia: si faltan las tres variables, se desactiva. */
+export function loadGoogleConfigOptional(): GoogleConfig | undefined {
+  const sheetsId = process.env.GOOGLE_SHEETS_ID?.trim();
+  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim();
+  const key = process.env.GOOGLE_PRIVATE_KEY?.trim();
+  if (!sheetsId && !email && !key) {
+    return undefined;
+  }
+  if (!sheetsId || !email || !key) {
+    throw new Error(
+      'Configuración incompleta de Google Sheets: define GOOGLE_SHEETS_ID, GOOGLE_SERVICE_ACCOUNT_EMAIL y GOOGLE_PRIVATE_KEY, o ninguna.',
+    );
+  }
+  return {
+    sheetsId,
+    serviceAccountEmail: email,
+    privateKey: key.replace(/\\n/g, '\n'),
+  };
+}

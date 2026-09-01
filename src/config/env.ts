@@ -1,11 +1,13 @@
 import { resolveBusinessTimezone } from './business';
 import { DashboardConfig, loadDashboardConfig } from './dashboard';
 import { DiscordConfig, loadDiscordConfig } from './discord';
-import { GoogleConfig, loadGoogleConfig } from './google';
+import { GoogleConfig, loadGoogleConfigOptional } from './google';
+import { MysqlConfig, loadMysqlConfig } from './mysql';
 
 export interface AppConfig {
   discord: DiscordConfig;
-  google: GoogleConfig;
+  mysql: MysqlConfig;
+  google?: GoogleConfig;
   dashboard?: DashboardConfig;
   timezone: string;
 }
@@ -13,7 +15,8 @@ export interface AppConfig {
 export function loadConfig(): AppConfig {
   return {
     discord: loadDiscordConfig(),
-    google: loadGoogleConfig(),
+    mysql: loadMysqlConfig(),
+    google: loadGoogleConfigOptional(),
     dashboard: loadDashboardConfig(),
     timezone: resolveBusinessTimezone(process.env.TIMEZONE),
   };

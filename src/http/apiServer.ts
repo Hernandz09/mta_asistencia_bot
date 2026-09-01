@@ -1,0 +1,447 @@
+import { timingSafeEqual } from 'node:crypto';
+import {
+  createServer,
+  IncomingMessage,
+  Server,
+  ServerResponse,
+} from 'node:http';
+import { Client } from 'discord.js';
+import { BOT_VERSION, StatsPeriod } from '../config/constants';
+import {
+  BotEstado,
+  BotEstadoHistorial,
+  BotEstadoNombre,
+  BotStateService,
+} from '../services/botStateService';
+import { StatsResumen, StatsService } from '../services/statsService';
+import { logger } from '../utils/logger';
+
+const ESTADOS: BotEstadoNombre[] = ['ACTIVO', 'MANTENIMIENTO', 'DESACTIVADO'];
+
+export interface BotApiServerOptions {
+  port: number;
+  apiKey?: string;
+  client: Client;
+  botStateService: BotStateService;
+  statsService: StatsService;
+  startedAt: number;
+}
+
+function sendJson(
+  res: ServerResponse,
+  status: number,
+  body: unknown,
+): void {
+  const payload = JSON.stringify(body);
+  res.writeHead(status, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers':
+      'Content-Type, Authorization, x-api-key, Idempotency-Key',
+    'Access-Control-Allow-Methods': 'GET, PUT, POST, OPTIONS',
+  });
+  res.end(payload);
+}
+
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
+  });
+}
+
+function extractApiKey(req: IncomingMessage): string | undefined {
+  const headerKey = req.headers['x-api-key'];
+  if (typeof headerKey === 'string' && headerKey.trim()) {
+    return headerKey.trim();
+  }
+  const auth = req.headers.authorization;
+  if (typeof auth === 'string' && auth.toLowerCase().startsWith('bearer ')) {
+    return auth.slice(7).trim();
+  }
+  return undefined;
+}
+
+function keysMatch(provided: string | undefined, expected: string): boolean {
+  if (!provided) return false;
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+function toIso(value: Date | null): string | null {
+  return value ? value.toISOString() : null;
+}
+
+function estadoPayload(
+  estado: BotEstado,
+  extra: {
+    uptimeSegundos: number;
+    latenciaMs: number;
+    dbOk: boolean;
+    discordOk: boolean;
+  },
+) {
+  return {
+    data: {
+      estado: estado.estado,
+      mensaje: estado.mensaje,
+      programado_hasta: toIso(estado.programadoHasta),
+      version: estado.version || BOT_VERSION,
+      uptime_segundos: Math.floor(extra.uptimeSegundos),
+      latencia_ms: extra.latenciaMs,
+      conexiones: {
+        base_datos: extra.dbOk ? 'OK' : 'ERROR',
+        api_erp: 'OK',
+        discord: extra.discordOk ? 'OK' : 'ERROR',
+      },
+      ultima_sincronizacion: toIso(estado.ultimaSincronizacion),
+      actualizado_en: toIso(estado.actualizadoEn),
+      actualizado_por: estado.actualizadoPorNombre
+        ? { nombre: estado.actualizadoPorNombre }
+        : null,
+    },
+  };
+}
+
+function historialPayload(row: BotEstadoHistorial) {
+  return {
+    id: row.id,
+    estado_anterior: row.estadoAnterior,
+    estado_nuevo: row.estadoNuevo,
+    mensaje: row.mensaje,
+    programado_hasta: toIso(row.programadoHasta),
+    origen: row.origen,
+    usuario_id: row.usuarioId,
+    usuario: row.usuarioNombre ? { nombre: row.usuarioNombre } : null,
+    notificado_canal: row.notificadoCanal,
+    creado_en: toIso(row.creadoEn),
+  };
+}
+
+function resumenPayload(resumen: StatsResumen) {
+  return {
+    data: {
+      practicante: {
+        id: resumen.practicante.id,
+        discord_id: resumen.practicante.discordId || null,
+        nombre: resumen.practicante.displayName,
+        area: resumen.practicante.area,
+        estado: resumen.practicante.estado,
+        fecha_inicio: resumen.practicante.fechaInicio,
+      },
+      periodo: resumen.periodo,
+      periodo_label: resumen.periodoLabel,
+      desde: resumen.startDate,
+      hasta: resumen.endDate,
+      nivel: resumen.nivel,
+      horas_historicas: resumen.allTimeHours,
+      ranking: { posicion: resumen.ranking, total: resumen.rankingTotal },
+      asistencia: {
+        puntuales: resumen.summary.puntuales,
+        tardanzas: resumen.summary.tardanzas,
+        faltas: resumen.summary.faltas,
+        programadas: resumen.summary.programadas,
+        asistidas: resumen.summary.asistidas,
+      },
+      horas: {
+        acumuladas: resumen.summary.horasAcumuladas,
+        semana: resumen.horasSemana,
+        meta_semana: resumen.metaSemana,
+        por_justificar: resumen.summary.horasPorJustificar,
+      },
+      indicadores: {
+        pct_asistencia: resumen.summary.pctAsistencia,
+        pct_puntualidad: resumen.summary.pctPuntualidad,
+        pct_horas: resumen.summary.pctHoras,
+        nota: resumen.summary.nota,
+      },
+      recuperaciones: {
+        cumplidas: resumen.recupCumplidas,
+        pendientes: resumen.recupPendientes,
+      },
+    },
+  };
+}
+
+async function parseEstadoBody(
+  req: IncomingMessage,
+): Promise<Record<string, unknown>> {
+  const raw = await readBody(req);
+  if (!raw.trim()) return {};
+  return JSON.parse(raw) as Record<string, unknown>;
+}
+
+export function startBotApiServer(options: BotApiServerOptions): Server {
+  const { port, apiKey, client, botStateService, statsService, startedAt } =
+    options;
+
+  const server = createServer(async (req, res) => {
+    try {
+      if (!req.url || !req.method) {
+        sendJson(res, 400, { error: { code: 400, message: 'Petición inválida' } });
+        return;
+      }
+
+      if (req.method === 'OPTIONS') {
+        sendJson(res, 204, {});
+        return;
+      }
+
+      const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`);
+      const path = url.pathname.replace(/\/+$/, '') || '/';
+      const method = req.method.toUpperCase();
+
+      if (
+        (method === 'GET' && path === '/health') ||
+        (method === 'GET' && path === '/api/v1/bot/health')
+      ) {
+        const dbOk = await botStateService.pingDatabase();
+        const discordOk = client.isReady();
+        const ok = dbOk && discordOk;
+        sendJson(res, ok ? 200 : 503, {
+          data: {
+            status: ok ? 'ok' : 'degraded',
+            discord: discordOk ? 'OK' : 'ERROR',
+            base_datos: dbOk ? 'OK' : 'ERROR',
+            version: BOT_VERSION,
+            uptime_segundos: Math.floor((Date.now() - startedAt) / 1000),
+          },
+        });
+        return;
+      }
+
+      if (!apiKey) {
+        sendJson(res, 503, {
+          error: {
+            code: 503,
+            message: 'API del bot no configurada: define BOT_API_KEY.',
+          },
+        });
+        return;
+      }
+
+      if (!keysMatch(extractApiKey(req), apiKey)) {
+        sendJson(res, 401, {
+          error: { code: 401, message: 'API Key ausente o inválida.' },
+        });
+        return;
+      }
+
+      if (method === 'GET' && path === '/api/v1/bot/estado') {
+        const [estado, dbOk] = await Promise.all([
+          botStateService.getEstado(true),
+          botStateService.pingDatabase(),
+        ]);
+        await botStateService.touchSincronizacion();
+        sendJson(
+          res,
+          200,
+          estadoPayload(estado, {
+            uptimeSegundos: (Date.now() - startedAt) / 1000,
+            latenciaMs: Math.max(0, Math.round(client.ws.ping)),
+            dbOk,
+            discordOk: client.isReady(),
+          }),
+        );
+        return;
+      }
+
+      const applyEstado = async (body: Record<string, unknown>) => {
+        const estadoRaw = String(body.estado ?? '');
+        if (!ESTADOS.includes(estadoRaw as BotEstadoNombre)) {
+          sendJson(res, 400, {
+            error: { code: 400, message: 'estado inválido.' },
+          });
+          return;
+        }
+        const estadoNombre = estadoRaw as BotEstadoNombre;
+        const mensaje =
+          typeof body.mensaje === 'string' ? body.mensaje.slice(0, 255) : null;
+        if (estadoNombre !== 'ACTIVO' && !mensaje) {
+          sendJson(res, 400, {
+            error: {
+              code: 400,
+              message: 'mensaje es obligatorio si el estado no es ACTIVO.',
+            },
+          });
+          return;
+        }
+
+        let programadoHasta: Date | null = null;
+        if (typeof body.programado_hasta === 'string' && body.programado_hasta) {
+          programadoHasta = new Date(body.programado_hasta);
+          if (Number.isNaN(programadoHasta.getTime())) {
+            sendJson(res, 400, {
+              error: { code: 400, message: 'programado_hasta inválido.' },
+            });
+            return;
+          }
+          if (programadoHasta.getTime() <= Date.now()) {
+            sendJson(res, 422, {
+              error: {
+                code: 422,
+                message: 'programado_hasta debe ser una fecha futura.',
+              },
+            });
+            return;
+          }
+        }
+
+        const actual = await botStateService.getEstado(true);
+        const nextMensaje = estadoNombre === 'ACTIVO' ? null : mensaje;
+        if (
+          actual.estado === estadoNombre &&
+          (actual.mensaje ?? null) === (nextMensaje ?? null)
+        ) {
+          sendJson(res, 409, {
+            error: {
+              code: 409,
+              message: 'El bot ya está en ese estado con el mismo mensaje.',
+            },
+          });
+          return;
+        }
+
+        const updated = await botStateService.setEstado({
+          estado: estadoNombre,
+          mensaje: nextMensaje,
+          programadoHasta,
+          permitirAdmins:
+            typeof body.permitir_admins === 'boolean'
+              ? body.permitir_admins
+              : undefined,
+          origen: 'ERP',
+          notificarCanal: body.notificar_canal !== false,
+        });
+        const dbOk = await botStateService.pingDatabase();
+        sendJson(
+          res,
+          200,
+          estadoPayload(updated, {
+            uptimeSegundos: (Date.now() - startedAt) / 1000,
+            latenciaMs: Math.max(0, Math.round(client.ws.ping)),
+            dbOk,
+            discordOk: client.isReady(),
+          }),
+        );
+      };
+
+      if (method === 'PUT' && path === '/api/v1/bot/estado') {
+        await applyEstado(await parseEstadoBody(req));
+        return;
+      }
+
+      if (method === 'POST' && path === '/api/v1/bot/estado/activar') {
+        await applyEstado({ estado: 'ACTIVO', notificar_canal: true });
+        return;
+      }
+      if (method === 'POST' && path === '/api/v1/bot/estado/mantenimiento') {
+        const body = (await parseEstadoBody(req).catch(
+          () => ({}),
+        )) as Record<string, unknown>;
+        await applyEstado({
+          estado: 'MANTENIMIENTO',
+          mensaje:
+            (body.mensaje as string) ?? 'El bot está en mantenimiento.',
+          programado_hasta: body.programado_hasta,
+          notificar_canal: body.notificar_canal ?? true,
+        });
+        return;
+      }
+      if (method === 'POST' && path === '/api/v1/bot/estado/desactivar') {
+        const body = (await parseEstadoBody(req).catch(
+          () => ({}),
+        )) as Record<string, unknown>;
+        await applyEstado({
+          estado: 'DESACTIVADO',
+          mensaje: (body.mensaje as string) ?? 'Fuera de servicio',
+          notificar_canal: body.notificar_canal ?? true,
+        });
+        return;
+      }
+
+      const historialMatch = path.match(
+        /^\/api\/v1\/bot\/estado\/historial(?:\/(\d+))?$/,
+      );
+      if (method === 'GET' && historialMatch) {
+        if (historialMatch[1]) {
+          const row = await botStateService.getHistorialById(
+            Number(historialMatch[1]),
+          );
+          if (!row) {
+            sendJson(res, 404, {
+              error: { code: 404, message: 'Registro no encontrado.' },
+            });
+            return;
+          }
+          sendJson(res, 200, { data: historialPayload(row) });
+          return;
+        }
+
+        const usuarioId = url.searchParams.get('usuario_id');
+        const result = await botStateService.listHistorial({
+          desde: url.searchParams.get('desde') ?? undefined,
+          hasta: url.searchParams.get('hasta') ?? undefined,
+          estado: url.searchParams.get('estado') ?? undefined,
+          usuarioId: usuarioId ? Number(usuarioId) : undefined,
+          page: Number(url.searchParams.get('page') ?? 1),
+          perPage: Number(url.searchParams.get('per_page') ?? 20),
+        });
+        sendJson(res, 200, {
+          data: result.rows.map(historialPayload),
+          meta: {
+            page: result.page,
+            per_page: result.perPage,
+            total: result.total,
+          },
+        });
+        return;
+      }
+
+      const resumenMatch = path.match(
+        /^\/api\/v1\/practicantes\/(\d+)\/resumen$/,
+      );
+      if (method === 'GET' && resumenMatch) {
+        const periodoParam = (url.searchParams.get('periodo') ??
+          'mes') as StatsPeriod;
+        const periodo: StatsPeriod =
+          periodoParam === 'semana' ||
+          periodoParam === 'mes' ||
+          periodoParam === 'total'
+            ? periodoParam
+            : 'mes';
+        const resumen = await statsService.getResumenByPracticanteId(
+          Number(resumenMatch[1]),
+          periodo,
+        );
+        if (!resumen) {
+          sendJson(res, 404, {
+            error: { code: 404, message: 'Practicante no encontrado.' },
+          });
+          return;
+        }
+        sendJson(res, 200, resumenPayload(resumen));
+        return;
+      }
+
+      sendJson(res, 404, {
+        error: { code: 404, message: 'Ruta no encontrada.' },
+      });
+    } catch (error) {
+      logger.error('Error en API HTTP del bot:', error);
+      sendJson(res, 500, {
+        error: { code: 500, message: 'Error interno del bot.' },
+      });
+    }
+  });
+
+  server.listen(port, '0.0.0.0', () => {
+    logger.info(`API HTTP del bot escuchando en 0.0.0.0:${port}`);
+  });
+
+  return server;
+}

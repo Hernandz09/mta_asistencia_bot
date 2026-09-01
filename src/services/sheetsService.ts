@@ -102,6 +102,26 @@ export class SheetsService {
     });
   }
 
+  async readAllRecords(): Promise<AttendanceRecord[]> {
+    const response = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: SHEET_DATA_RANGE,
+    });
+
+    const rows = response.data.values ?? [];
+    const records: AttendanceRecord[] = [];
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row?.[0] && !row?.[2]) {
+        continue;
+      }
+      records.push(rowToRecord(row, i + 1));
+    }
+
+    return records;
+  }
+
   async findTodayRecord(
     discordId: string,
     date: string,

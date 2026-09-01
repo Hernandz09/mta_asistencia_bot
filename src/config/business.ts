@@ -7,8 +7,8 @@ import { DEFAULT_TIMEZONE } from './constants';
 export const BUSINESS_RULES = {
   timezone: DEFAULT_TIMEZONE,
   punctuality: {
-    // Minutos de tolerancia tras la hora_inicio individual antes de pasar de Puntual a Tardanza.
-    toleranceMinutes: 10,
+    // Spec ESPEC-ASIS-001: 5 min tras hora_inicio.
+    toleranceMinutes: 5,
   },
   schedule: {
     sheetName: 'Horarios',

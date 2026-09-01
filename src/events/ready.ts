@@ -11,6 +11,7 @@ import { AppConfig } from '../config/env';
 import { buildAttendanceButtonRow } from '../components/attendanceButtons';
 import { buildAttendancePanelEmbed } from '../embeds/response.embeds';
 import { AttendanceService } from '../services/attendanceService';
+import { BotStateService } from '../services/botStateService';
 import { scheduleAutoClose } from '../services/autoCloseJob';
 import { ScheduleService } from '../services/scheduleService';
 import { logger } from '../utils/logger';
@@ -94,12 +95,16 @@ export function registerReadyWithInit(
   client: Client,
   attendanceService: AttendanceService,
   scheduleService: ScheduleService,
+  botStateService: BotStateService,
   config: AppConfig,
 ): void {
   client.once(Events.ClientReady, async (readyClient) => {
     try {
       await attendanceService.initialize();
       await scheduleService.initialize();
+      botStateService.attachClient(readyClient);
+      await botStateService.refreshPresence();
+      botStateService.startPolling();
       scheduleAutoClose(
         attendanceService,
         config.timezone,
@@ -110,7 +115,7 @@ export function registerReadyWithInit(
         config.discord.attendanceChannelId,
       );
       logger.info(`Bot conectado como ${readyClient.user.tag}`);
-      logger.info('Google Sheets inicializado correctamente');
+      logger.info('Almacenamiento principal: MySQL (Sheets solo emergencia)');
     } catch (error) {
       logger.error('Error al inicializar el bot:', error);
       process.exit(1);

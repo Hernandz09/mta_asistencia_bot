@@ -11,15 +11,22 @@ import {
   buildExitSuccessEmbed,
   buildGenericErrorEmbed,
 } from '../embeds/response.embeds';
-import { AttendanceService } from '../services/attendanceService';
+import { buildStatusEmbed } from '../embeds/status.embeds';
+import {
+  handleStatsButton,
+  handleStatsSelect,
+  handleStatusSelect,
+} from './componentHandler';
+import { CommandContext } from '../types/command.type';
+import { hasStaffRole } from '../utils/roles';
 import { isAttendanceError } from '../utils/errors';
 import { logger } from '../utils/logger';
 
 async function handleMarcarEntrada(
   interaction: ButtonInteraction,
-  attendanceService: AttendanceService,
+  context: CommandContext,
 ): Promise<void> {
-  const { date, entryTime, status } = await attendanceService.registerEntry(
+  const { date, entryTime, status } = await context.attendanceService.registerEntry(
     interaction.user.id,
     interaction.user.username,
   );
@@ -31,10 +38,10 @@ async function handleMarcarEntrada(
 
 async function handleMarcarSalida(
   interaction: ButtonInteraction,
-  attendanceService: AttendanceService,
+  context: CommandContext,
 ): Promise<void> {
   const { date, exitTime, horasTrabajadas, horasRestantes } =
-    await attendanceService.registerExit(interaction.user.id);
+    await context.attendanceService.registerExit(interaction.user.id);
 
   await interaction.editReply({
     embeds: [
@@ -45,37 +52,73 @@ async function handleMarcarSalida(
 
 export function registerButtonHandler(
   client: Client,
-  attendanceService: AttendanceService,
+  context: CommandContext,
 ): void {
   client.on(Events.InteractionCreate, async (interaction) => {
-    if (!interaction.isButton()) return;
-
-    const { customId } = interaction;
-
-    if (
-      customId !== BUTTON_CUSTOM_IDS.MARCAR_ENTRADA &&
-      customId !== BUTTON_CUSTOM_IDS.MARCAR_SALIDA
-    ) {
-      return;
-    }
-
     try {
-      // Ack inmediato: Sheets + dashboard suelen superar el límite de 3s de Discord
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
-      if (customId === BUTTON_CUSTOM_IDS.MARCAR_ENTRADA) {
-        await handleMarcarEntrada(interaction, attendanceService);
+      if (interaction.isStringSelectMenu()) {
+        if (await handleStatsSelect(interaction, context)) return;
+        if (await handleStatusSelect(interaction, context)) return;
         return;
       }
 
-      await handleMarcarSalida(interaction, attendanceService);
+      if (!interaction.isButton()) return;
+
+      if (await handleStatsButton(interaction, context)) return;
+
+      const { customId } = interaction;
+      if (
+        customId !== BUTTON_CUSTOM_IDS.MARCAR_ENTRADA &&
+        customId !== BUTTON_CUSTOM_IDS.MARCAR_SALIDA
+      ) {
+        return;
+      }
+
+      const isAdmin = hasStaffRole(interaction, context.adminRoleId);
+      const { allowed, estado } = await context.botStateService.canMark(
+        isAdmin,
+      );
+      if (!allowed) {
+        await interaction.reply({
+          embeds: [
+            buildStatusEmbed(
+              estado,
+              {
+                latencyMs: Math.max(0, Math.round(interaction.client.ws.ping)),
+                uptimeSeconds: process.uptime(),
+                dbOk: true,
+                ventanaEntrada: null,
+              },
+              'practicante',
+            ),
+          ],
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      }
+
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+      if (customId === BUTTON_CUSTOM_IDS.MARCAR_ENTRADA) {
+        await handleMarcarEntrada(interaction, context);
+        return;
+      }
+
+      await handleMarcarSalida(interaction, context);
     } catch (error) {
+      if (!interaction.isButton() && !interaction.isStringSelectMenu()) {
+        return;
+      }
+
       const embed = isAttendanceError(error)
         ? buildErrorEmbed(error.userMessage)
         : buildGenericErrorEmbed();
 
       if (!isAttendanceError(error)) {
-        logger.error(`Error en botón ${customId}:`, error);
+        logger.error(
+          `Error en componente ${'customId' in interaction ? interaction.customId : ''}:`,
+          error,
+        );
       }
 
       try {
@@ -89,12 +132,8 @@ export function registerButtonHandler(
           flags: MessageFlags.Ephemeral,
         });
       } catch (replyError) {
-        // El estado local de la interacción (deferred/replied) puede quedar
-        // desincronizado del servidor si el ack inicial falló por una
-        // condición de carrera (10062) pero sí llegó a registrarse en Discord.
-        // No dejar que esto tumbe el proceso.
         logger.error(
-          `No se pudo responder al botón ${customId} tras un error:`,
+          'No se pudo responder al componente tras un error:',
           replyError,
         );
       }

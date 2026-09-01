@@ -11,6 +11,10 @@
     "seed:horarios": "tsx src/scripts/seedHorarios.ts",
     "format:sheets": "tsx src/scripts/formatSheets.ts",
     "setup:practicantes-clases": "tsx src/scripts/setupPracticantesYClases.ts",
+    "db:schema": "tsx src/scripts/applyMysqlSchema.ts",
+    "db:migrate": "tsx src/scripts/migrateSheetsToMysql.ts",
+    "db:link-discord": "tsx src/scripts/linkDiscordIds.ts",
+    "db:dump": "tsx src/scripts/dumpSheetsToSql.ts",
     "test": "vitest run"
   },
   "keywords": [
@@ -28,6 +32,7 @@
     "discord.js": "^14.16.3",
     "dotenv": "^16.4.7",
     "googleapis": "^144.0.0",
+    "mysql2": "^3.24.2",
     "node-cron": "^4.6.0"
   },
   "devDependencies": {
