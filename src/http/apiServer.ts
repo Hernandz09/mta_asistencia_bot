@@ -368,7 +368,7 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
       const method = req.method.toUpperCase();
 
       if (
-        method === 'GET' &&
+        (method === 'GET' || method === 'HEAD') &&
         (isPanelPath(path) || (path === '/' && wantsHtml(req)))
       ) {
         sendHtml(res, PANEL_HTML);

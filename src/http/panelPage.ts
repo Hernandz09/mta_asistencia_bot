@@ -21,6 +21,7 @@ export const PANEL_HTML = `<!DOCTYPE html>
       --radius: 18px;
     }
     * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
     html, body { margin: 0; min-height: 100%; }
     body {
       font-family: "Segoe UI", system-ui, sans-serif;
@@ -126,11 +127,13 @@ export const PANEL_HTML = `<!DOCTYPE html>
     <div class="brand">MTA Software</div>
     <h1>Panel de asistencias</h1>
     <p>Entra para editar horarios, ver stats, cargar horas extra y agregar practicantes al bot.</p>
-    <label for="clave">Clave de acceso</label>
-    <input id="clave" type="password" autocomplete="current-password" placeholder="••••••" />
-    <div class="row" style="margin-top:18px">
-      <button type="button" id="entrar">Entrar al panel</button>
-    </div>
+    <form id="login-form">
+      <label for="clave">Clave de acceso</label>
+      <input id="clave" type="password" autocomplete="current-password" placeholder="Escribe la clave" />
+      <div class="row" style="margin-top:18px">
+        <button type="submit" id="entrar">Entrar al panel</button>
+      </div>
+    </form>
     <div id="login-msg"></div>
   </div>
 </div>
@@ -275,25 +278,42 @@ async function loadPeople() {
   people = json.data;
   renderPeople();
 }
-async function entrar() {
-  const clave = $("clave").value.trim() || sessionStorage.getItem(KEY) || "";
+function showApp() {
+  $("login").hidden = true;
+  $("app").hidden = false;
+}
+function showLogin(msg) {
+  $("app").hidden = true;
+  $("login").hidden = false;
+  if (msg) $("login-msg").innerHTML = '<div class="msg err">' + msg + "</div>";
+}
+async function entrar(ev) {
+  if (ev && ev.preventDefault) ev.preventDefault();
+  const clave = ($("clave").value || "").trim() || sessionStorage.getItem(KEY) || "";
   if (!clave) {
-    $("login-msg").innerHTML = '<div class="msg err">Escribe la clave.</div>';
+    showLogin("Escribe la clave.");
     return;
   }
+  const btn = $("entrar");
+  btn.disabled = true;
+  btn.textContent = "Entrando…";
   try {
     sessionStorage.setItem(KEY, clave);
-    await api("/api/v1/panel/login", { method: "POST", body: JSON.stringify({ clave: clave }) });
-    $("login").hidden = true;
-    $("app").hidden = false;
     await loadPeople();
+    $("login-msg").innerHTML = "";
+    showApp();
   } catch (e) {
-    $("login-msg").innerHTML = '<div class="msg err">' + e.message + "</div>";
     sessionStorage.removeItem(KEY);
+    showLogin(e.message === "Unauthorized" || /401|inválida|incorrecta/i.test(e.message)
+      ? "Clave incorrecta."
+      : e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Entrar al panel";
   }
 }
-$("entrar").onclick = entrar;
-$("clave").addEventListener("keydown", (ev) => { if (ev.key === "Enter") entrar(); });
+$("login-form").addEventListener("submit", entrar);
+if (sessionStorage.getItem(KEY)) entrar();
 $("salir").onclick = () => { sessionStorage.removeItem(KEY); location.reload(); };
 $("reload").onclick = () => loadPeople().catch((e) => flash(e.message));
 document.querySelectorAll("nav [data-tab]").forEach((btn) => {
