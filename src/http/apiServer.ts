@@ -22,7 +22,12 @@ import {
 import { ConfigService } from '../services/configService';
 import { ErpPracticante, ErpReadService } from '../services/erpReadService';
 import { ExtraHoursService } from '../services/extraHoursService';
+import {
+  ScheduleAdminError,
+  ScheduleAdminService,
+} from '../services/scheduleAdminService';
 import { handleExtraHoursApi } from './extraHoursApi';
+import { PANEL_HTML } from './panelPage';
 import {
   RankingResult,
   RankingService,
@@ -46,7 +51,9 @@ export interface BotApiServerOptions {
   configService: ConfigService;
   erpReadService: ErpReadService;
   extraHoursService?: ExtraHoursService;
+  scheduleAdminService?: ScheduleAdminService;
   timezone: string;
+  panelKey?: string;
   startedAt: number;
 }
 
@@ -60,7 +67,7 @@ function sendJson(
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers':
-      'Content-Type, Authorization, x-api-key, Idempotency-Key',
+      'Content-Type, Authorization, x-api-key, x-panel-key, Idempotency-Key',
     'Access-Control-Allow-Methods': 'GET, PUT, POST, PATCH, DELETE, OPTIONS',
   });
   res.end(payload);
@@ -75,7 +82,19 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
+function sendHtml(res: ServerResponse, html: string): void {
+  res.writeHead(200, {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'no-store',
+  });
+  res.end(html);
+}
+
 function extractApiKey(req: IncomingMessage): string | undefined {
+  const panelKey = req.headers['x-panel-key'];
+  if (typeof panelKey === 'string' && panelKey.trim()) {
+    return panelKey.trim();
+  }
   const headerKey = req.headers['x-api-key'];
   if (typeof headerKey === 'string' && headerKey.trim()) {
     return headerKey.trim();
@@ -93,6 +112,11 @@ function keysMatch(provided: string | undefined, expected: string): boolean {
   const b = Buffer.from(expected);
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);
+}
+
+function isAuthorized(req: IncomingMessage, accepted: string[]): boolean {
+  const provided = extractApiKey(req);
+  return accepted.some((key) => keysMatch(provided, key));
 }
 
 function toIso(value: Date | null): string | null {
@@ -306,7 +330,9 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
     configService,
     erpReadService,
     extraHoursService,
+    scheduleAdminService,
     timezone,
+    panelKey,
     startedAt,
   } = options;
 
@@ -333,6 +359,7 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
               servicio: 'Bot de Asistencias MTA',
               health: '/api/v1/bot/health',
               api: '/api/v1',
+              panel: '/panel',
             },
           });
           return;
@@ -361,7 +388,33 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
         return;
       }
 
-      if (!apiKey) {
+      if (method === 'GET' && (path === '/panel' || path === '/admin')) {
+        sendHtml(res, PANEL_HTML);
+        return;
+      }
+
+      if (method === 'POST' && path === '/api/v1/panel/login') {
+        const body = (await parseEstadoBody(req).catch(
+          () => ({}),
+        )) as Record<string, unknown>;
+        const clave = String(body.clave ?? body.password ?? '');
+        if (
+          (panelKey && keysMatch(clave, panelKey)) ||
+          (apiKey && keysMatch(clave, apiKey))
+        ) {
+          sendJson(res, 200, { data: { ok: true } });
+          return;
+        }
+        sendJson(res, 401, {
+          error: { code: 401, message: 'Clave incorrecta.' },
+        });
+        return;
+      }
+
+      const acceptedKeys = [apiKey, panelKey].filter(
+        (key): key is string => Boolean(key),
+      );
+      if (acceptedKeys.length === 0) {
         sendJson(res, 503, {
           error: {
             code: 503,
@@ -371,7 +424,7 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
         return;
       }
 
-      if (!keysMatch(extractApiKey(req), apiKey)) {
+      if (!isAuthorized(req, acceptedKeys)) {
         sendJson(res, 401, {
           error: { code: 401, message: 'API Key ausente o inválida.' },
         });
@@ -568,6 +621,10 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
                 'GET|POST|PUT|DELETE /api/v1/practicantes/{id}/horas-extra',
               marcaciones: 'GET /api/v1/marcaciones?practicante_id&desde&hasta',
               horarios: 'GET /api/v1/horarios?practicante_id=',
+              panel: 'GET /panel',
+              admin_practicantes: 'GET /api/v1/admin/practicantes',
+              alta: 'POST /api/v1/practicantes',
+              horario_write: 'PUT /api/v1/practicantes/{id}/horario',
             },
           },
         });
@@ -640,6 +697,49 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
         sendJson(res, 200, {
           data: await attachDiscordUsernames(client, list),
         });
+        return;
+      }
+
+      if (method === 'GET' && path === '/api/v1/admin/practicantes') {
+        if (!scheduleAdminService) {
+          sendJson(res, 503, {
+            error: { code: 503, message: 'Admin de horarios no disponible.' },
+          });
+          return;
+        }
+        sendJson(res, 200, { data: await scheduleAdminService.list() });
+        return;
+      }
+
+      if (method === 'POST' && path === '/api/v1/practicantes') {
+        if (!scheduleAdminService) {
+          sendJson(res, 503, {
+            error: { code: 503, message: 'Admin de horarios no disponible.' },
+          });
+          return;
+        }
+        try {
+          const body = await parseEstadoBody(req);
+          const created = await scheduleAdminService.ensurePracticante({
+            nombres: String(body.nombres ?? ''),
+            apellidos: String(body.apellidos ?? ''),
+            discordId: body.discord_id ? String(body.discord_id) : null,
+            area: typeof body.area === 'string' ? body.area : undefined,
+            carrera: typeof body.carrera === 'string' ? body.carrera : null,
+            ciclo: typeof body.ciclo === 'string' ? body.ciclo : null,
+            fechaInicio:
+              typeof body.fecha_inicio === 'string' ? body.fecha_inicio : null,
+          });
+          sendJson(res, 201, { data: created });
+        } catch (error) {
+          if (error instanceof ScheduleAdminError) {
+            sendJson(res, error.httpStatus, {
+              error: { code: error.httpStatus, message: error.message },
+            });
+            return;
+          }
+          throw error;
+        }
         return;
       }
 
@@ -737,6 +837,35 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
       const horarioMatch = path.match(
         /^\/api\/v1\/practicantes\/(\d+)\/horario$/,
       );
+      if (horarioMatch && method === 'PUT') {
+        if (!scheduleAdminService) {
+          sendJson(res, 503, {
+            error: { code: 503, message: 'Admin de horarios no disponible.' },
+          });
+          return;
+        }
+        try {
+          const body = await parseEstadoBody(req);
+          const saved = await scheduleAdminService.saveHorario(
+            Number(horarioMatch[1]),
+            body.dias ?? body.days,
+            typeof body.limite_horas_semana === 'number'
+              ? body.limite_horas_semana
+              : undefined,
+          );
+          statsService.invalidatePracticante(saved.id);
+          sendJson(res, 200, { data: saved });
+        } catch (error) {
+          if (error instanceof ScheduleAdminError) {
+            sendJson(res, error.httpStatus, {
+              error: { code: error.httpStatus, message: error.message },
+            });
+            return;
+          }
+          throw error;
+        }
+        return;
+      }
       if (method === 'GET' && horarioMatch) {
         const horario = await erpReadService.getHorario(Number(horarioMatch[1]));
         if (!horario) {

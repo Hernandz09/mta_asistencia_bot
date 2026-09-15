@@ -30,7 +30,17 @@ export const PRACTICANTES_SCHEDULE: HorarioPracticante[] = [
       3: { inicio: '09:00', fin: '15:00' },
       4: { inicio: '09:00', fin: '15:00' },
       5: { inicio: '09:00', fin: '15:00' },
-      6: { inicio: '09:00', fin: '15:00' },
+      6: { inicio: '12:00', fin: '18:00' },
+    },
+  },
+  {
+    nombre: 'Kiara Reyes',
+    dias: {
+      1: { inicio: '12:00', fin: '18:00' },
+      3: { inicio: '09:00', fin: '15:00' },
+      4: { inicio: '09:00', fin: '15:00' },
+      5: { inicio: '09:00', fin: '15:00' },
+      6: { inicio: '12:00', fin: '18:00' },
     },
   },
   {

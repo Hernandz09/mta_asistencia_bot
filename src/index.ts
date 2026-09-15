@@ -15,6 +15,7 @@ import { ConfigService } from './services/configService';
 import { ErpReadService } from './services/erpReadService';
 import { ExtraHoursService } from './services/extraHoursService';
 import { RankingService } from './services/rankingService';
+import { ScheduleAdminService } from './services/scheduleAdminService';
 import { StatsService } from './services/statsService';
 import { CommandContext } from './types/command.type';
 import { logger } from './utils/logger';
@@ -55,6 +56,12 @@ async function main(): Promise<void> {
     extraHoursService,
   );
   const botStateService = new BotStateService(pool);
+  const scheduleAdminService = new ScheduleAdminService(pool, scheduleService);
+  try {
+    await scheduleAdminService.ensureKiaraYasumySaturday();
+  } catch (error) {
+    logger.error('No se pudo aplicar el horario de Yasumy/Kiara:', error);
+  }
 
   const client = new Client({
     intents: [GatewayIntentBits.Guilds],
@@ -97,7 +104,9 @@ async function main(): Promise<void> {
     configService,
     erpReadService,
     extraHoursService,
+    scheduleAdminService,
     timezone: config.timezone,
+    panelKey: process.env.ADMIN_PANEL_PASSWORD?.trim() || '220207',
     startedAt: Date.now(),
   });
 
