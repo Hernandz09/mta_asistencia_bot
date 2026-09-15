@@ -82,6 +82,21 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
+function wantsHtml(req: IncomingMessage): boolean {
+  const accept = String(req.headers.accept ?? '');
+  return accept.includes('text/html');
+}
+
+function isPanelPath(path: string): boolean {
+  const normalized = path.toLowerCase();
+  return (
+    normalized === '/panel' ||
+    normalized === '/admin' ||
+    normalized === '/index.html' ||
+    normalized === '/panel.html'
+  );
+}
+
 function sendHtml(res: ServerResponse, html: string): void {
   res.writeHead(200, {
     'Content-Type': 'text/html; charset=utf-8',
@@ -352,20 +367,29 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
       const path = url.pathname.replace(/\/+$/, '') || '/';
       const method = req.method.toUpperCase();
 
-      if (method === 'GET' && (path === '/favicon.ico' || path === '/')) {
-        if (path === '/') {
-          sendJson(res, 200, {
-            data: {
-              servicio: 'Bot de Asistencias MTA',
-              health: '/api/v1/bot/health',
-              api: '/api/v1',
-              panel: '/panel',
-            },
-          });
-          return;
-        }
+      if (
+        method === 'GET' &&
+        (isPanelPath(path) || (path === '/' && wantsHtml(req)))
+      ) {
+        sendHtml(res, PANEL_HTML);
+        return;
+      }
+
+      if (method === 'GET' && path === '/favicon.ico') {
         res.writeHead(204);
         res.end();
+        return;
+      }
+
+      if (method === 'GET' && path === '/') {
+        sendJson(res, 200, {
+          data: {
+            servicio: 'Bot de Asistencias MTA',
+            health: '/api/v1/bot/health',
+            api: '/api/v1',
+            panel: '/panel',
+          },
+        });
         return;
       }
 
@@ -385,11 +409,6 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
             uptime_segundos: Math.floor((Date.now() - startedAt) / 1000),
           },
         });
-        return;
-      }
-
-      if (method === 'GET' && (path === '/panel' || path === '/admin')) {
-        sendHtml(res, PANEL_HTML);
         return;
       }
 
@@ -425,6 +444,10 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
       }
 
       if (!isAuthorized(req, acceptedKeys)) {
+        if (method === 'GET' && wantsHtml(req)) {
+          sendHtml(res, PANEL_HTML);
+          return;
+        }
         sendJson(res, 401, {
           error: { code: 401, message: 'API Key ausente o inválida.' },
         });
