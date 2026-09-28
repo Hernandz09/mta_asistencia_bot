@@ -141,6 +141,10 @@ export class RankingService {
     return this.configService.getRankingConfig();
   }
 
+  clearCache(): void {
+    this.cache.clear();
+  }
+
   async getRanking(query: RankingQuery): Promise<RankingResult> {
     const limite = Math.max(1, query.limite);
     const cacheKey = [

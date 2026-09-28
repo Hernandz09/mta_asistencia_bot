@@ -877,6 +877,7 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
               : undefined,
           );
           statsService.invalidatePracticante(saved.id);
+          rankingService.clearCache();
           sendJson(res, 200, { data: saved });
         } catch (error) {
           if (error instanceof ScheduleAdminError) {
@@ -898,6 +899,81 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
           return;
         }
         sendJson(res, 200, { data: horario });
+        return;
+      }
+
+      const estadoMatch = path.match(
+        /^\/api\/v1\/practicantes\/(\d+)\/estado$/,
+      );
+      if (estadoMatch && method === 'PUT') {
+        if (!scheduleAdminService) {
+          sendJson(res, 503, {
+            error: { code: 503, message: 'Admin de horarios no disponible.' },
+          });
+          return;
+        }
+        try {
+          const body = await parseEstadoBody(req);
+          const saved = await scheduleAdminService.setEstado(
+            Number(estadoMatch[1]),
+            String(body.estado ?? ''),
+          );
+          statsService.invalidatePracticante(saved.id);
+          rankingService.clearCache();
+          sendJson(res, 200, { data: saved });
+        } catch (error) {
+          if (error instanceof ScheduleAdminError) {
+            sendJson(res, error.httpStatus, {
+              error: { code: error.httpStatus, message: error.message },
+            });
+            return;
+          }
+          throw error;
+        }
+        return;
+      }
+
+      const jornadaMatch = path.match(
+        /^\/api\/v1\/practicantes\/(\d+)\/jornadas\/(\d{4}-\d{2}-\d{2})$/,
+      );
+      if (jornadaMatch && method === 'PUT') {
+        if (!scheduleAdminService) {
+          sendJson(res, 503, {
+            error: { code: 503, message: 'Admin de horarios no disponible.' },
+          });
+          return;
+        }
+        try {
+          const body = await parseEstadoBody(req);
+          const horasRaw = body.horas;
+          const horas =
+            horasRaw == null || horasRaw === ''
+              ? null
+              : Number(horasRaw);
+          const saved = await scheduleAdminService.saveJornadaDia({
+            practicanteId: Number(jornadaMatch[1]),
+            fecha: jornadaMatch[2],
+            entrada: body.entrada == null ? null : String(body.entrada),
+            salida: body.salida == null ? null : String(body.salida),
+            estadoEntrada:
+              body.estado_entrada == null || body.estado_entrada === ''
+                ? null
+                : String(body.estado_entrada),
+            estadoJornada: String(body.estado_jornada ?? body.estado ?? ''),
+            horas: horas != null && Number.isFinite(horas) ? horas : null,
+          });
+          statsService.invalidatePracticante(Number(jornadaMatch[1]));
+          rankingService.clearCache();
+          sendJson(res, 200, { data: saved });
+        } catch (error) {
+          if (error instanceof ScheduleAdminError) {
+            sendJson(res, error.httpStatus, {
+              error: { code: error.httpStatus, message: error.message },
+            });
+            return;
+          }
+          throw error;
+        }
         return;
       }
 

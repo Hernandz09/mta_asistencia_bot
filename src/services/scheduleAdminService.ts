@@ -1,6 +1,6 @@
 import { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { PRACTICANTE_AREAS } from '../config/constants';
-import { computeHoursDifference } from '../utils/date';
+import { computeHoursDifference, limaLocalToUtc } from '../utils/date';
 import { logger } from '../utils/logger';
 import { ScheduleService } from './scheduleService';
 
@@ -16,6 +16,24 @@ const DAY_LABELS = [
 ] as const;
 
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const ESTADOS_PRACTICANTE = ['activo', 'cesado', 'suspendido'] as const;
+const ESTADOS_JORNADA = [
+  'ABIERTA',
+  'CERRADA',
+  'FALTA',
+  'LICENCIA',
+  'VACACIONES',
+  'NO_LABORABLE',
+  'FALTA_JUSTIFICADA',
+] as const;
+const ESTADOS_ENTRADA = [
+  'PUNTUAL',
+  'PUNTUAL_ANTICIPADO',
+  'TARDANZA',
+  'FUERA_DE_HORARIO',
+  'SIN_MARCA',
+] as const;
 const SEED_FLAG = 'seed.kiara_yasumy_sabado';
 const KIARA_DISCORD_ID = '743334334613946380';
 
@@ -82,6 +100,15 @@ function hhmm(value: string | null | undefined): string | null {
 function toTimeSql(value: string | null): string | null {
   if (!value) return null;
   return value.length === 5 ? `${value}:00` : value;
+}
+
+function normalizeClock(value: string | null | undefined): string | null {
+  const text = String(value ?? '').trim();
+  if (!text) return null;
+  if (!TIME_RE.test(text)) {
+    throw new ScheduleAdminError(400, 'La hora debe ser HH:mm.');
+  }
+  return text.slice(0, 5);
 }
 
 export function normalizeDays(raw: unknown): AdminDay[] {
@@ -356,6 +383,125 @@ export class ScheduleAdminService {
     const saved = await this.getById(practicanteId);
     if (!saved) throw new ScheduleAdminError(500, 'No se pudo leer el horario guardado.');
     return saved;
+  }
+
+  async setEstado(
+    practicanteId: number,
+    estado: string,
+  ): Promise<AdminPracticanteRow> {
+    if (!(ESTADOS_PRACTICANTE as readonly string[]).includes(estado)) {
+      throw new ScheduleAdminError(
+        400,
+        'estado debe ser activo, cesado o suspendido.',
+      );
+    }
+    const practicante = await this.getById(practicanteId);
+    if (!practicante) {
+      throw new ScheduleAdminError(404, 'Practicante no encontrado.');
+    }
+    await this.pool.query(
+      'UPDATE practicantes SET estado = ? WHERE id = ?',
+      [estado, practicanteId],
+    );
+    const saved = await this.getById(practicanteId);
+    if (!saved) throw new ScheduleAdminError(500, 'No se pudo leer el estado guardado.');
+    return saved;
+  }
+
+  async saveJornadaDia(params: {
+    practicanteId: number;
+    fecha: string;
+    entrada: string | null;
+    salida: string | null;
+    estadoEntrada: string | null;
+    estadoJornada: string;
+    horas: number | null;
+  }): Promise<{
+    fecha: string;
+    entrada: string | null;
+    salida: string | null;
+    estadoEntrada: string | null;
+    estadoJornada: string;
+    horas: number;
+  }> {
+    const practicante = await this.getById(params.practicanteId);
+    if (!practicante) {
+      throw new ScheduleAdminError(404, 'Practicante no encontrado.');
+    }
+    if (!DATE_RE.test(params.fecha)) {
+      throw new ScheduleAdminError(400, 'fecha debe ser YYYY-MM-DD.');
+    }
+    if (!(ESTADOS_JORNADA as readonly string[]).includes(params.estadoJornada)) {
+      throw new ScheduleAdminError(400, 'estado de la jornada inválido.');
+    }
+    const entrada = normalizeClock(params.entrada);
+    const salida = normalizeClock(params.salida);
+    let estadoEntrada = params.estadoEntrada?.trim() || null;
+    if (estadoEntrada && !(ESTADOS_ENTRADA as readonly string[]).includes(estadoEntrada)) {
+      throw new ScheduleAdminError(400, 'estado de entrada inválido.');
+    }
+    if (!entrada && params.estadoJornada === 'FALTA' && !estadoEntrada) {
+      estadoEntrada = 'SIN_MARCA';
+    }
+    let horas = params.horas;
+    if (horas == null || !Number.isFinite(horas)) {
+      horas = entrada && salida ? computeHoursDifference(entrada, salida) : 0;
+    }
+    if (horas < 0 || horas > 24) {
+      throw new ScheduleAdminError(400, 'horas debe estar entre 0 y 24.');
+    }
+    horas = Math.round(horas * 100) / 100;
+
+    const [existing] = await this.pool.query<RowDataPacket[]>(
+      `SELECT hora_entrada_programada, hora_salida_programada
+       FROM jornadas
+       WHERE practicante_id = ? AND fecha = ? AND contexto = 'REGULAR'
+       LIMIT 1`,
+      [params.practicanteId, params.fecha],
+    );
+    const programadaEntrada = existing[0]?.hora_entrada_programada ?? null;
+    const programadaSalida = existing[0]?.hora_salida_programada ?? null;
+    const entradaUtc = entrada ? limaLocalToUtc(params.fecha, entrada) : null;
+    const salidaUtc = salida ? limaLocalToUtc(params.fecha, salida) : null;
+    const estadoSalida = salida ? 'PUNTUAL' : entrada ? 'SIN_SALIDA' : null;
+
+    await this.pool.query(
+      `INSERT INTO jornadas
+        (practicante_id, fecha, contexto, recuperacion_id,
+         hora_entrada_programada, hora_salida_programada,
+         entrada_real, salida_real, estado_entrada, estado_salida, estado_jornada,
+         horas_computadas, horas_por_justificar, horas_justificadas, minutos_tardanza, recalculado_en)
+       VALUES (?, ?, 'REGULAR', NULL, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, UTC_TIMESTAMP(3))
+       ON DUPLICATE KEY UPDATE
+         entrada_real = VALUES(entrada_real),
+         salida_real = VALUES(salida_real),
+         estado_entrada = VALUES(estado_entrada),
+         estado_salida = VALUES(estado_salida),
+         estado_jornada = VALUES(estado_jornada),
+         horas_computadas = VALUES(horas_computadas),
+         recalculado_en = VALUES(recalculado_en)`,
+      [
+        params.practicanteId,
+        params.fecha,
+        programadaEntrada,
+        programadaSalida,
+        entradaUtc,
+        salidaUtc,
+        estadoEntrada,
+        estadoSalida,
+        params.estadoJornada,
+        horas,
+      ],
+    );
+
+    return {
+      fecha: params.fecha,
+      entrada,
+      salida,
+      estadoEntrada,
+      estadoJornada: params.estadoJornada,
+      horas,
+    };
   }
 
   private async dedicatedHorarioId(
