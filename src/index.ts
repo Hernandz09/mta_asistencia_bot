@@ -94,7 +94,7 @@ async function main(): Promise<void> {
     process.env.BOT_API_KEY?.trim() ||
     process.env.ATTENDANCE_BOT_API_KEY?.trim();
   const port = Number(process.env.PORT ?? 3000);
-  startBotApiServer({
+  const httpServer = startBotApiServer({
     port,
     apiKey,
     client,
@@ -109,6 +109,27 @@ async function main(): Promise<void> {
     panelKey: process.env.ADMIN_PANEL_PASSWORD?.trim() || '220207',
     startedAt: Date.now(),
   });
+
+  let shuttingDown = false;
+  const shutdown = (signal: string): void => {
+    if (shuttingDown) {
+      return;
+    }
+    shuttingDown = true;
+    logger.info(`Señal ${signal}: cerrando bot y API.`);
+    const forceExit = setTimeout(() => process.exit(1), 10_000);
+    forceExit.unref();
+    httpServer.close(() => {
+      client.destroy();
+      pool
+        .end()
+        .catch((error) => logger.error('Error al cerrar MySQL:', error))
+        .finally(() => process.exit(0));
+    });
+    httpServer.closeAllConnections?.();
+  };
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
+  process.once('SIGINT', () => shutdown('SIGINT'));
 
   await client.login(config.discord.token);
 }

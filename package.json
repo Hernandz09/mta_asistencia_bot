@@ -8,6 +8,7 @@
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "deploy-commands": "tsx src/deploy-commands.ts",
+    "commands:register": "node dist/deploy-commands.js",
     "seed:horarios": "tsx src/scripts/seedHorarios.ts",
     "format:sheets": "tsx src/scripts/formatSheets.ts",
     "setup:practicantes-clases": "tsx src/scripts/setupPracticantesYClases.ts",

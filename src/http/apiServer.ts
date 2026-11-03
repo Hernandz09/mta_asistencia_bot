@@ -385,11 +385,20 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
         sendJson(res, 200, {
           data: {
             servicio: 'Bot de Asistencias MTA',
+            live: '/health/live',
             health: '/api/v1/bot/health',
             api: '/api/v1',
             panel: '/panel',
           },
         });
+        return;
+      }
+
+      if (
+        method === 'GET' &&
+        (path === '/health/live' || path === '/live')
+      ) {
+        sendJson(res, 200, { data: { status: 'ok' } });
         return;
       }
 
@@ -632,6 +641,7 @@ export function startBotApiServer(options: BotApiServerOptions): Server {
             version: BOT_VERSION,
             modelo: 'El bot es independiente. El ERP solo consume esta API.',
             endpoints: {
+              live: 'GET /health/live',
               health: 'GET /api/v1/bot/health',
               estado: 'GET|PUT /api/v1/bot/estado',
               config: 'GET|PUT /api/v1/config',

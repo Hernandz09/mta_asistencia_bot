@@ -188,6 +188,27 @@ npm run build && npm start
 
 ---
 
+## Despliegue en Coolify
+
+El proceso es un bot de Discord más una API HTTP. MySQL sigue fuera del contenedor (Hostinger u otro host). No hace falta volumen.
+
+1. **Recurso** — En Coolify, *+ New → Application*. Conecta el repositorio Git y elige la rama a desplegar.
+2. **Build pack** — `Dockerfile` (el del repo). Puerto expuesto: `3000`. Coolify inyecta `PORT`; no lo definas en las variables.
+3. **Health check** — Ruta `GET /health/live`, puerto `3000`. Esa ruta solo confirma que el proceso HTTP está vivo. `/api/v1/bot/health` responde 503 mientras Discord o MySQL no estén listos y Coolify puede entrar en un bucle de reinicios.
+4. **Una réplica** — Deja el servicio en 1 instancia. Dos contenedores con el mismo `DISCORD_TOKEN` se pisan las interacciones.
+5. **Variables** — Copia las de `.env.example` en *Environment Variables*:
+   - Obligatorias: `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`, `ATTENDANCE_CHANNEL_ID`, `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_SSL=true`, `BOT_API_KEY`, `TIMEZONE`.
+   - Panel: `ADMIN_PANEL_PASSWORD`.
+   - Google (opcional, respaldo): `GOOGLE_SHEETS_ID`, `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PRIVATE_KEY`. En Coolify puedes pegar la clave en varias líneas o con `\n` literales; el proceso convierte `\n` en saltos reales.
+   - `PUBLIC_API_URL` no la lee el bot. Es la URL https del dominio de Coolify, para configurarla en el ERP.
+6. **Dominio** — Asigna un dominio al servicio si el ERP o el panel (`/panel`) deben entrar desde internet. El proxy de Coolify termina TLS y reenvía al puerto 3000.
+7. **Red** — El VPS tiene que salir a Discord (HTTPS) y al puerto `3306` de MySQL. Si Hostinger filtra por IP, autoriza la IP pública del VPS.
+8. **Comandos slash** — Tras el primer despliegue, en la terminal del contenedor: `npm run commands:register`.
+
+El contenedor cierra el cliente de Discord, la API y el pool de MySQL al recibir `SIGTERM` (redeploy de Coolify).
+
+---
+
 ## Scripts
 
 | Script | Descripción |
@@ -195,7 +216,8 @@ npm run build && npm start
 | `npm run dev` | Desarrollo con recarga (`tsx watch`) |
 | `npm run build` | Compila a `dist/` |
 | `npm start` | Ejecuta el build |
-| `npm run deploy-commands` | Publica slash commands |
+| `npm run deploy-commands` | Publica slash commands (desarrollo, vía `tsx`) |
+| `npm run commands:register` | Publica slash commands desde `dist/` (contenedor Coolify) |
 
 ---
 
